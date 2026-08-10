@@ -187,6 +187,7 @@ namespace Motion
             // init misc stuff
             logIP2DUART = Cvar::Get("logIP2DUART", "0");
             duartChannel = LogChannel(DUART_LOG_CHANNEL_NAME, ConsoleColor::BrightGreen, ConsoleColor::White);
+            Logger::AddChannel(duartChannel);
             logEnabled = logIP2DUART->GetValue();
 
             if (logEnabled)

@@ -29,6 +29,7 @@ namespace Motion
         Coherent::RegisterExtension(extensionDC4);
 
         dc4Channel = LogChannel(DC4_LOG_CHANNEL_NAME, ConsoleColor::BrightCyan, ConsoleColor::White);
+        Logger::AddChannel(dc4Channel);
         logDC4 = Cvar::Get("logDC4", "0");
         
         logEnabled = logDC4->GetValue();

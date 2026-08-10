@@ -1,0 +1,23 @@
+M  O  T  I  O  N
+The SGI Emulator
+
+Release Notes
+
+0.2.0
+
+0.1.1 (August 10, 2026)
+    * Fixed log file crashing early in initialisation.
+        * I forgot that strncpy with overlapping memory is undefined behaviour.
+    * Fixed a bug where memory was being incorrectly deallocated.
+    * Create the profile folder if it does not exist.
+    * Fix many issues with invalid cleanup on shutdown, should fix shutdown crashes.
+    * Added a very bad and crude memory / VRAM viewer.
+    * Use SDL HiDPI flag on window creation.
+    * Add logDC4 convar and suppress DC4 Logging by default 
+    * Fix log channels never actually being added
+        * Fix custom log channels never being used
+    * ASAN -O2 now added by default on debug builds 
+
+0.1.0 (August 9, 2026)
+    * Initial release.
+    Has CPU, MMU, serial, dip switches, dummy RTC, SRAM, partial multibus, mostly complete UC4, partial DC4 emulation

@@ -101,7 +101,7 @@ namespace Motion
             Coherent::RegisterExtension(mmuExtension);
 
             mmuChannel = LogChannel(MMU_LOG_CHANNEL_NAME, ConsoleColor::BrightCyan, ConsoleColor::White);
-
+            Logger::AddChannel(mmuChannel);
             logEnabled = logIP2MMU->GetValue();
 
             if (logEnabled)

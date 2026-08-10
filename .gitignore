@@ -4,3 +4,7 @@
 build/*
 src/build/*
 build/output/*
+*.pdn
+
+# this is for later
+assets/irisfont.png

@@ -19,6 +19,7 @@
 //                                      Add ChannelExists(const char*) to check if a channel exists.
 //                                      Fix channel masks in settings not doing anything.
 // 5.3.1            August 8, 2026      Add GetChannelMask to get the channel mask.
+// 5.4.0            August 10, 2026     Fix custom channels, add GetChannel
 
 #pragma once
 
@@ -43,7 +44,7 @@
 
 // Strings, change to localise or whatever
 
-#define STRING_VERSION                  "5.3.1 (August 8, 2026)"                // Version number as a string (we don't need it in any other form)
+#define STRING_VERSION                  "5.4.0 (August 10, 2026)"               // Version number as a string (we don't need it in any other form)
 #define STRING_SIGN_ON                  "SSLS-NG (Starfrost Shared Logging System - Next Gen) " STRING_VERSION " initialised" 
 #define STRING_ANSI_PREFIX              "\x1B["                                 // Some ANSI commands use this as a prefix
 
@@ -274,6 +275,21 @@ namespace LOGGER_NAMESPACE
             return false;
         }
 
+        /// @brief Gets a pointer to a custom channel object.
+        /// @param channelName The name of the channel to obtain.
+        /// @return A pointer to the channel object if the channel was successfully enabled, otherwise a null pointer.
+        inline static LogChannel* GetChannel(const char* channelName)
+        {
+            for (auto& customChannel : customChannels)
+            {
+                if (!strcmp(customChannel.name, channelName))
+                    return &customChannel;
+            }
+
+            // don't like exceptions
+            return nullptr;
+        }
+
         /// @brief Sets the enablement state of a custom channel.
         /// @param channelName The name of the channel to enable.
         /// @return True if the channel was successfully enabled, otherwise false.
@@ -308,7 +324,19 @@ namespace LOGGER_NAMESPACE
                 return;
             }
 
-            LogChannel customChannel;
+            if (channelName)
+            {
+                LogChannel* customChannel = GetChannel(channelName);
+
+                if (!customChannel)
+                {
+                    std::cout << "SSLS Error 4: Invalid channel name " << channelName << "supplied!" << std::endl;
+                    return;
+                }
+
+                if (!customChannel->enabled)
+                    return;
+            }
 
             if (channelName == nullptr)
             {

@@ -128,6 +128,8 @@ namespace Motion
         uint64_t GetMemorySize() { return (sizeX * sizeY) << 2; };
 
         RenderTextureDrawType drawType = RenderTextureDrawType::Default;
+
+        virtual ~RenderTexture() { };
     protected:
         Renderer* renderer; 
         uint8_t* pixels;

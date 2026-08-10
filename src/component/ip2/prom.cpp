@@ -33,13 +33,11 @@ namespace Motion
 
         mapping.component = this;
         AddrSpace::AddMapping(mapping);
-
-   
     }
 
     void PROM::Shutdown()
     {
-        delete rom;
+        delete[] rom;
     }
 
 }

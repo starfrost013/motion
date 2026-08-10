@@ -34,6 +34,12 @@ namespace Motion
 
     FileStream* Profile::Open(const char* path, FileFlags mode, bool skipProfileAddition)
     {
+        // Ensure there actually is a profile folder
+        if (!std::filesystem::exists(profileFolder->GetString()))
+        {
+            std::filesystem::create_directory(profileFolder->GetString());
+        }
+
         if (!skipProfileAddition)
         {
             // BOZO user (ME!) might not ensure a buffer of the right size!! so copy into a safe, temporary buffer first...TO SAVE THE MEMORY'S INTEGRITY!

@@ -11,6 +11,8 @@
 
 namespace Motion
 {
+    Cvar* logUC4;
+
     void UC4::Start()
     {
         // multibus is early start, guaranteed
@@ -25,6 +27,15 @@ namespace Motion
 
         extensionUC4 = new CoherentExtensionUC4(this);
         Coherent::RegisterExtension(extensionUC4);
+
+        uc4Channel = LogChannel(UC4_LOG_CHANNEL_NAME, ConsoleColor::BrightCyan, ConsoleColor::White);
+        Logger::AddChannel(uc4Channel);
+        logUC4 = Cvar::Get("logUC4", "0");
+        
+        logEnabled = logUC4->GetValue();
+
+        if (logEnabled)
+            Logger::SetChannelEnabled(UC4_LOG_CHANNEL_NAME);
     }
 
     // I/O
@@ -43,7 +54,7 @@ namespace Motion
                 break;
         }
 
-        Logger::Log(LOG_PREFIX_UC4, std::format("UC4 Read16 0x{:x} from 0x{:x}", ret, addr).c_str(), LogChannels::Debug);
+        Logger::Log(LOG_PREFIX_UC4, std::format("UC4 Read16 0x{:x} from 0x{:x}", ret, addr).c_str(), UC4_LOG_CHANNEL_NAME);
         return ret;
     }
 
@@ -99,7 +110,7 @@ namespace Motion
                 break;
         }
 
-        Logger::Log(LOG_PREFIX_UC4, std::format("UC4 Write16 0x{:x} to 0x{:x}", value, addr).c_str(), LogChannels::Debug);
+        Logger::Log(LOG_PREFIX_UC4, std::format("UC4 Write16 0x{:x} to 0x{:x}", value, addr).c_str(), UC4_LOG_CHANNEL_NAME);
     }
 
     void UC4::WriteBuffer(size_t addr, uint16_t value)

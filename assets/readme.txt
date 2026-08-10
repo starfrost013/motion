@@ -57,7 +57,9 @@ Command line:
         logIP2RTC
             Enables debug log messages for the IP2 RTC, which is currently a stub emulation. 
         logDC4
-            Enables debug log messages for the
+            Enables debug log messages for the Display Controller.
+        logUC4
+            Enables debug log messages for the Update Controller.
         logChannels
             Provide a custom log channel mask. Default is -1, which means "use the emulator's default settings":
 

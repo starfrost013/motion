@@ -21,11 +21,20 @@ namespace Motion
         vram = new uint8_t[vramSize];
 
         Logger::Log(std::format("Video RAM size is {} bytes", vramSize).c_str());
+
+        CoherentEditor::Settings settings;
+        settings.buf = vram;
+        settings.bufSize = GetCapacity();
+        settings.name = "VRAM Editor";
+
+        CoherentEditor* editor = new CoherentEditor(this, settings);
+        Coherent::RegisterExtension(editor);
+        
     }
 
 
     void ComponentVRAM::Shutdown()
     {
-        delete vram;
+        delete[] vram;
     }
 }

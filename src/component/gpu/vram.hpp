@@ -12,6 +12,7 @@
 
 #pragma once
 #include <component/component.hpp>
+#include <coherent/coherent_editor.hpp>
 
 namespace Motion
 {
@@ -35,9 +36,13 @@ namespace Motion
         /// @return the vram address that maps to that coordinate.
         virtual size_t GetVramAddress(int32_t x, int32_t y) { return 0; };
 
+        // Getters for private
         uint8_t* GetPixels() { return vram; };
+        size_t GetCapacity() { return GetInternalFbSizeX() * GetInternalFbSizeY() * GetBytesPerPixel();  };
+
+        // Setters for private
     protected: 
         uint8_t* vram; 
-
+        CoherentEditor* vramEditor;
     };
 };

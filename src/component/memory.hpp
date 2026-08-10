@@ -10,6 +10,7 @@
 #include <Motion.hpp>
 #include <component/component.hpp>
 #include <base/emulation.hpp>
+#include <coherent/coherent_editor.hpp>
 
 namespace Motion
 {    
@@ -37,5 +38,6 @@ namespace Motion
     private: 
         size_t GetRamCapacity() { return Emulation::GetMachine()->totalRamInstalled; };
 
+        CoherentEditor* memoryEditor;
     };
 }

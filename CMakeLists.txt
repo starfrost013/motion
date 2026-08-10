@@ -18,6 +18,8 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/output/$<CONFIG>)
 # Install path
 set(ROM_SRC_DIR "${CMAKE_SOURCE_DIR}/roms")
 set(ROM_DST_DIR "${CMAKE_BINARY_DIR}/output/$<CONFIG>/roms")
+set(ASSET_SRC_DIR "${CMAKE_SOURCE_DIR}/assets")
+set(ASSET_DST_DIR "${CMAKE_BINARY_DIR}/output/$<CONFIG>/")
 
 project(motion)
 
@@ -33,6 +35,17 @@ add_subdirectory(external/sdl3 EXCLUDE_FROM_ALL)
 # Also allow us to use our own headers. At some point, we need to have a public/private header distinction...
 add_subdirectory(src)
 
+# Setup our build type info
+if("${CMAKE_BUILD_TYPE}" STREQUAL "Debug")
+    target_compile_definitions(motion PRIVATE DEBUG)
+    # Turn on ASan, O1 level optimisation. -fno-omit-frame-pointer gives us 
+    target_compile_options(motion PRIVATE -fsanitize=address -O2 -fno-omit-frame-pointer -fno-inline -U_FORTIFY_SOURCE)
+elseif("${CMAKE_BUILD_TYPE}" STREQUAL "Release")
+    target_compile_definitions(motion PRIVATE RELEASE)
+elseif("${CMAKE_BUILD_TYPE}" STREQUAL "RelWithDebInfo")
+    target_compile_definitions(motion PRIVATE RELEASE)
+    target_compile_definitions(motion PRIVATE RELEASE_WITH_DEBUG_INFO)
+endif()
 
 if(WIN32 AND MINGW)
     target_link_options(motion PRIVATE 
@@ -44,19 +57,29 @@ elseif(APPLE)
 elseif(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
     # if you statically link everything basically pipewrie will KILL SDL lol
     target_link_options(motion PRIVATE -static-libstdc++ -static-libgcc)             # static stdc++
+
+    if ("${CMAKE_BUILD_TYPE}" STREQUAL "Debug")
+        target_link_options(motion PRIVATE -fsanitize=address)
+    endif()
 elseif(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     # Clang on Linux/BSD: -static-libstdc++ is fine, -static-libgcc is not reliable
     target_link_options(motion PRIVATE -static-libstdc++)
+
+    if ("${CMAKE_BUILD_TYPE}" STREQUAL "Debug")
+        target_link_options(motion PRIVATE -fsanitize=address)
+    endif()
 endif()
 
 target_link_libraries(motion PRIVATE 
 SDL3::SDL3-static                   # static sdl3
 moira)                              # 68k
 
-
 # install
 add_custom_target(InstallAssets 
     COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different "${ROM_SRC_DIR}" "${ROM_DST_DIR}"
+    COMMENT "Updating ROMs..."
+
+    COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different "${ASSET_SRC_DIR}" "${ASSET_DST_DIR}"
     COMMENT "Updating ROMs..."
 )
 

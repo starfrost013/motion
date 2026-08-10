@@ -47,7 +47,7 @@ namespace Motion
         RendererSDL3* sdl3Renderer = static_cast<RendererSDL3*>(renderer);
         SDL_ReleaseGPUTexture(sdl3Renderer->gpuDevice, texture);
         
-        delete pixels; 
+        delete[] pixels; 
     }
 
 };

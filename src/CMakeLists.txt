@@ -69,5 +69,6 @@ add_executable(motion
     base/machine/machine_iris3130.cpp
     component/gpu/juniper/uc4/uc4_debug.cpp
     component/gpu/juniper/uc4/uc4_commands.cpp
+    coherent/coherent_editor.cpp
 )
 

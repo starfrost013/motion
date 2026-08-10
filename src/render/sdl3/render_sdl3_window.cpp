@@ -15,7 +15,7 @@ namespace Motion
     {
         Logger::Log(LOG_PREFIX_RENDER_SDL3, "Initialising SDL window...", LogChannels::Debug);
 
-        window = SDL_CreateWindow(WINDOW_TITLE_DEFAULT, sizeX, sizeY, 0);
+        window = SDL_CreateWindow(WINDOW_TITLE_DEFAULT, sizeX, sizeY, SDL_WINDOW_HIGH_PIXEL_DENSITY);
 
         if (!window) // noreturn
             Logger::Log(LOG_PREFIX_RENDER_SDL3, std::format("Failed to initialise SDL Window!", SDL_GetError()).c_str(), LogChannels::FatalError);

@@ -131,7 +131,9 @@ namespace Motion
 
     #define UC4_FONT_ROM_SIZE       0x10000
 
+    extern Cvar* logUC4;
     #define LOG_PREFIX_UC4          "UC4"
+    #define UC4_LOG_CHANNEL_NAME    LOG_PREFIX_UC4
 
     // As it turns out this is a very common operation because of how the write enable code works.
     #define APPLY_WE_CODE(newV, orig, mask) (orig & ~mask) | (newV & mask)
@@ -212,5 +214,8 @@ namespace Motion
         uint16_t ReadBuffer(size_t addr);
         void WriteBuffer(size_t addr, uint16_t value);
         void ParseCommand(size_t addr, uint16_t value);
+        
+        LogChannel uc4Channel;
+        bool logEnabled;
     }; 
 }; 

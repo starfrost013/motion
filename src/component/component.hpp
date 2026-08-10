@@ -53,5 +53,10 @@ namespace Motion
         /// @brief an early start component, is dependent on 
         virtual bool IsEarlyStart() { return false; }; 
 
+        virtual ~Component()
+        {
+            
+        }
+
     };
 }

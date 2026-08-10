@@ -97,7 +97,7 @@ namespace Motion
 
     void Machine::Shutdown()
     {
-        for (Component *component : components)
+        for (Component* component : components)
         {
             component->Shutdown();
             components.pop_back();

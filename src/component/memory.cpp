@@ -15,7 +15,6 @@ namespace Motion
     #define MEM_SEG0_START          0x0
     #define MEM_SEG1_START          0x1000000
     #define MEM_SEG2_START          0x2000000
-
   
     void Memory::Start()
     {
@@ -23,16 +22,16 @@ namespace Motion
         ram = new uint8_t[capacity];
         Logger::Log(LOG_PREFIX_EMU_MACHINE, std::format("System RAM is {} bytes", capacity).c_str());
         
-        AddrSpaceMapping mappingTd = AddrSpaceMapping();
+        AddrSpaceMapping mapping = AddrSpaceMapping();
 
         // gets mapped as text/data, stack and kernel
 
         // MMU segment 0 
 
-        mappingTd.startAddr = 0x0;
-        mappingTd.endAddr = mappingTd.startAddr + capacity;
-        mappingTd.component = this;
-        AddrSpace::AddMapping(mappingTd);
+        mapping.startAddr = 0x0;
+        mapping.endAddr = mapping.startAddr + capacity;
+        mapping.component = this;
+        AddrSpace::AddMapping(mapping);
 
         // This code is TEMPORARY for Version 0.1.x ONLY 
         ram[0] = 0x33; // initial sp=0x33000800
@@ -43,6 +42,14 @@ namespace Motion
         ram[5] = 0x00;
         ram[6] = 0x04;
         ram[7] = 0x00;
+
+        CoherentEditor::Settings settings;
+        settings.buf = ram;
+        settings.bufSize = capacity;
+        settings.name = "Memory Editor";
+
+        CoherentEditor* editor = new CoherentEditor(this, settings);
+        Coherent::RegisterExtension(editor);
     }
 
     uint8_t Memory::Read8(size_t addr)
@@ -138,6 +145,7 @@ namespace Motion
 
     void Memory::Shutdown()
     {
-        delete ram;
+        delete memoryEditor;
+        delete[] ram;
     }
 }
