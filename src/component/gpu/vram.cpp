@@ -25,7 +25,7 @@ namespace Motion
         CoherentEditor::Settings settings;
         settings.buf = vram;
         settings.bufSize = GetCapacity();
-        settings.name = "VRAM Editor";
+        settings.name = "VRAM Viewer";
 
         CoherentEditor* editor = new CoherentEditor(this, settings);
         Coherent::RegisterExtension(editor);

@@ -36,7 +36,7 @@
 #define APP_NAME            "motion"
 #define APP_SIGNON          "The SGI Emulator\nEmulation engine © 2026 starfrost\nOriginal hardware and software by Silicon Graphics, Inc. © 1981-1989"
 // This part will be replaced by some fancy GHA script later
-#define APP_VERSION         "0.2.0"
+#define APP_VERSION         "0.1.1"
 #define APP_BUILD_DATE      "@ " __DATE__ " " __TIME__
 
 // Exit codes

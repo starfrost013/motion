@@ -3,8 +3,6 @@ The SGI Emulator
 
 Release Notes
 
-0.2.0
-
 0.1.1 (August 10, 2026)
     * Fixed log file crashing early in initialisation.
         * I forgot that strncpy with overlapping memory is undefined behaviour.
