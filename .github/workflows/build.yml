@@ -141,7 +141,12 @@ jobs:
             platform="${platform#motion-}"
             cp "$f" "release/motion-${VERSION}-${platform}.tar.gz"
           done
-          cd release && sha256sum *.tar.gz | tee SHA256SUMS
+          for f in artifacts/*.zip; do
+            platform="$(basename "$f" .zip)"
+            platform="${platform#motion-}"
+            cp "$f" "release/motion-${VERSION}-${platform}.zip"
+          done 
+          cd release && sha256sum *.tar.gz && sha256sum *.zip | tee SHA256SUMS
         
       - name: Create release
         env:

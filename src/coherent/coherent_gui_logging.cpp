@@ -86,6 +86,7 @@ namespace Motion
         }
 
         // we already ensured that there is enough space left.
-        strncat(logBuffer, str, strLength);
+        if ((LOGBUF_MAX_SIZE - bufLength) > strLength)
+            strncat(logBuffer, str, strLength);
     }
 }
