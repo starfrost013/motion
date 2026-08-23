@@ -22,6 +22,7 @@
 #include <component/keyboard/keyboard_iris.hpp>
 #include <component/multibus/multibus.hpp>
 #include <component/gpu/juniper/dc4/dc4.hpp>
+#include <component/gpu/juniper/gf2/gf2.hpp>
 #include <component/gpu/juniper/uc4/uc4.hpp>
 #include <component/gpu/juniper/bp3/bp3.hpp>
 #include <component/storage/dsd5217.hpp>
@@ -47,6 +48,7 @@ namespace Motion
         AddComponent<IP2Switches>();
         AddComponent<IP2Clock>();
         AddComponent<IP2Mouse>();
+        AddComponent<GF2>();
         AddComponent<DC4>();
         AddComponent<UC4>();
         AddComponent<DSD5217>();
