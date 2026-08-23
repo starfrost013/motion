@@ -29,7 +29,7 @@ namespace Motion
         AddrSpaceMapping mapping = AddrSpaceMapping();
 
         mapping.startAddr = PROM_START_ADDRESS;
-        mapping.endAddr = mapping.startAddr + promSize->GetValue();
+        mapping.endAddr = mapping.startAddr + promSize->GetValue() - 1;   // GetMapping's end is inclusive
 
         mapping.component = this;
         AddrSpace::AddMapping(mapping);

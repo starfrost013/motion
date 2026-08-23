@@ -87,6 +87,26 @@ protected:
     
     // Write buffer (appears in 68010 exception frames)
     u16 writeBuffer {};
+
+    /*
+        Address registers to put back if this instruction bus errors.
+
+        A bus error can only be recovered from by restarting the whole instruction, so every
+        register change the instruction has already made has to be undone first. readOp commits
+        the -(An)/(An)+ update as soon as its own access succeeds, which is correct right up until
+        a later access in the same instruction faults: a byte copy loop of `move.b (a0)+,(a1)+`
+        whose destination page is not resident yet would otherwise restart with a0 already moved
+        and copy the wrong byte. Real hardware avoids the question by stacking its internal state
+        and rerunning only the faulted bus cycle; restarting from the registers the instruction
+        started with reaches the same end state.
+
+        Two slots is enough - no instruction reads through more than two predecrement or
+        postincrement operands. movem does its own bookkeeping, and the stack pointer moved by
+        push() is deliberately not covered: jsr reports its target as the fault address and is
+        meant to resume there with the return address pushed once.
+    */
+    struct { int an; u32 value; } anRollback[2] {};
+    int anRollbackCount {};
     
     // State flags used internally
     int flags {};

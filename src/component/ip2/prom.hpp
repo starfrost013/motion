@@ -16,6 +16,9 @@ namespace Motion
     class PROM : public Component
     {
     public: 
+        // The CPU fetches its reset vector out of here, so this has to be mapped before the CPU starts.
+        bool IsEarlyStart() override { return true; };
+
         void Start() override;
         void Shutdown() override;
 

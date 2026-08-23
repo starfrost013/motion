@@ -24,7 +24,7 @@ template <Core C> void writeStackFrame0001(u16 sr, u32 pc, u16 nr);
 template <Core C> void writeStackFrame0010(u16 sr, u32 pc, u32 ia, u16 nr);
 template <Core C> void writeStackFrame1000(StackFrame &frame, u16 sr, u32 pc, u32 ia, u16 nr, u32 addr);
 template <Core C> void writeStackFrame1001(u16 sr, u32 pc, u32 ia, u16 nr);
-template <Core C> void writeStackFrame1010(u16 sr, u32 pc, u16 nr);
+template <Core C> void writeStackFrame1010(StackFrame &frame, u16 sr, u32 pc, u16 nr);
 template <Core C> void writeStackFrame1011(u16 sr, u32 pc, u32 ia, u16 nr);
 
 // Emulates an exception other than address errors, bus errors, and interrupts

@@ -18,6 +18,10 @@
 
 namespace Motion
 {    
+    // An access past the end of fitted RAM is normal during the PROM's memory sizing, so do not let
+    // a storm of them bury everything else in the log.
+    #define MEMORY_MAX_OUT_OF_RANGE_LOGGED  16
+
     class Memory : public Component
     {
         uint8_t* ram;
@@ -41,6 +45,11 @@ namespace Motion
 
     private: 
         size_t GetRamCapacity() { return Emulation::GetMachine()->totalRamInstalled; };
+
+        /// @brief True if addr is backed by fitted RAM. Logs, rate limited, when it is not.
+        bool IsInRange(size_t addr, const char* what);
+
+        int32_t outOfRangeLogged = 0;
 
         CoherentEditor* memoryEditor;
     };

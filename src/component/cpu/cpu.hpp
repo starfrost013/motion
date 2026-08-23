@@ -16,6 +16,9 @@ namespace Motion
         /// @return a boolean indicating if the cpu is in privileged mode
         virtual bool IsPrivilegedMode() { return true; };
 
+        /// @brief Where the CPU is currently executing. Devices use this to say who touched them.
+        virtual uint32_t GetProgramCounter() { return 0; };
+
         // Getters for private fields
 
         /// @brief returns a boolean indicating if this cpu is in reset.

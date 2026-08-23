@@ -15,6 +15,7 @@
 #include <Motion.hpp>
 #include <base/filesystem/filesystem.hpp>
 #include <component/addrspace.hpp>
+#include <component/ip2/ip2_interrupt.hpp>
 #include <component/serial/serial.hpp>
 #include <coherent/coherent.hpp>
 
@@ -28,6 +29,21 @@ namespace Motion
     #define DUART1_START                            0x32800000
     #define DUART_NUM_REGS                          16
     #define DUART_NUM_INPUT_PORTS                   7
+
+    /*
+        The counter/timer is a 16 bit down counter clocked from whichever source ACR[6:4] selects.
+        Only the crystal sources are wired on this board - the external IP2 pin and the two
+        transmitter clocks go nowhere. X1 is the standard 3.6864MHz DUART crystal, which is the same
+        one the baud rate tables further down assume.
+
+        The kernel needs this before it will get anywhere: _calibuzz starts the counter, spins its
+        software delay loop, stops the counter and divides to work out how many loop iterations make a
+        millisecond. With a counter that never counts, that division produces a delay loop that never
+        finishes and _msdelay never returns.
+    */
+    #define DUART_X1_HZ                             3686400
+    #define DUART_COUNTER_MODE(acr)                 (((acr) >> 4) & 0x7)
+    #define DUART_COUNTER_MODE_IS_TIMER(acr)        (DUART_COUNTER_MODE(acr) & 0x4)
 
     // There is a small fifo in the 68681 for receiving bits
     #define DUART_FIFO_SIZE                         3
@@ -159,13 +175,13 @@ namespace Motion
             AddrSpaceMapping mapping0 = AddrSpaceMapping();
 
             mapping0.startAddr = DUART0_START;
-            mapping0.endAddr = DUART0_START + DUART_NUM_REGS;
+            mapping0.endAddr = DUART0_START + DUART_NUM_REGS - 1;   // GetMapping's end is inclusive
             mapping0.component = this;
 
             AddrSpaceMapping mapping1 = AddrSpaceMapping();
 
             mapping1.startAddr = DUART1_START;
-            mapping1.endAddr = DUART1_START + DUART_NUM_REGS;
+            mapping1.endAddr = DUART1_START + DUART_NUM_REGS - 1;
             mapping1.component = this;
 
             AddrSpace::AddMapping(mapping0);
@@ -263,6 +279,7 @@ namespace Motion
             uint16_t counter;           // counter/timer
             uint16_t counterPreset;     // counter/timer preset value
             bool counterRunning;        // true between a start counter command and a stop counter command
+            uint64_t counterStartNs;    // host time the counter was last loaded, for UpdateCounter
             uint8_t auxControl;         // auxillary control (misc.)
 
             uint8_t brgTest;            // allows extended / nonstandard baud rates ? maybe only on later models
@@ -291,7 +308,16 @@ namespace Motion
         uint32_t GetClockSpeed() override { return 0; };
 
         bool logEnabled = false;
+
+        IP2Interrupt* interrupts = nullptr;
     private:
+        /// @brief Bring the counter/timer up to the current time and update the counter ready bit.
+        void UpdateCounter(int32_t duartId);
+
+        /// @brief Period of one counter/timer tick in nanoseconds, or 0 if ACR selects a source that
+        /// isn't connected to anything on this board.
+        uint64_t GetCounterTickNs(int32_t duartId);
+
         /// @brief set the baud rate.
         /// @param channel The channel to use the clock source for.
         /// @param isRx TRUE - set transmit baud rate; FALSE - set receive baud rate.

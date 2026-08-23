@@ -255,6 +255,7 @@ Moira::execute()
         //
 
         reg.pc += 2;
+        anRollbackCount = 0;
         try {
             (this->*exec[queue.ird])(queue.ird);
         } catch (const std::exception &exc) {
@@ -316,6 +317,7 @@ Moira::execute()
         
         // Execute the instruction
         reg.pc += 2;
+        anRollbackCount = 0;
 
         if (flags & LOOPING) {
 
@@ -376,6 +378,18 @@ Moira::processException(const std::exception &exc)
         }
 
         if (auto be = dynamic_cast<const BusError *>(&exc); be) {
+
+            /*
+                The handler will restart this instruction, so put back any -(An)/(An)+ update it
+                already made - see anRollback. The registers are restored before the frame is
+                stacked, so what the exception handler saves is the state the instruction is about
+                to be re-entered with.
+            */
+            while (anRollbackCount) {
+
+                anRollbackCount--;
+                reg.a[anRollback[anRollbackCount].an] = anRollback[anRollbackCount].value;
+            }
 
             execBusError<C>(be->stackFrame);
             return;

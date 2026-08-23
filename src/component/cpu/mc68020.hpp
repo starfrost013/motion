@@ -5,11 +5,23 @@
 #include <component/cpu/cpu.hpp>
 #include <base/emulation.hpp>
 #include <component/cpu/mc68020_moira_bridge.hpp>
+#include <component/ip2/ip2_mmu.hpp>
 
 namespace Motion
 {
+    extern Cvar* logCpuTrace;
+
     #define MOIRA_DISASM_BUF_SIZE   512
     #define LOG_PREFIX_68020        "68020 CPU"
+
+    // Bring-up instrumentation, see TraceUnmapped in mc68020_core.cpp.
+    #define PC_TRACE_SIZE           (1 << 18)
+    #define PC_TRACE_MAX_DUMPS      4
+    #define PC_TRACE_SAMPLE_EVERY   5000000
+    #define PC_TRACE_FATAL_RAW_PCS  48
+
+    // A fault storm would otherwise fill the log.
+    #define MC68020_MAX_ESCAPED_EXCEPTIONS  16
 
     /// @brief Debugger extensions for Lisburn
     /// if it deals with the debugger it goes in here. if it doesn't it doesn't 
@@ -29,6 +41,7 @@ namespace Motion
         /// @brief for the coherent stack window
         uint32_t GetStack32(uint32_t offset) override
         {
+            AddrSpacePeek peek;
             return AddrSpace::ReadU32(moiraCpu->reg.sp + (offset << 2));
         };
 
@@ -68,7 +81,11 @@ namespace Motion
         /// @return a boolean indicating if the cpu is in privileged mode
         bool IsPrivilegedMode() override { return (moiraCpu.getSR() & 0x2000); }; // bit 13 is sr
 
+        uint32_t GetProgramCounter() override { return moiraCpu.getPC(); };
+
     private:
         MC68020DebuggerSystem* system; 
+        bool traceEnabled = false;
+        int32_t escapedExceptions = 0;
     };
 }

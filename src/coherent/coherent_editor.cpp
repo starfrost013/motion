@@ -14,6 +14,19 @@ namespace Motion
     Cvar* dumpsFolder;
 
     // DUMP memory
+    CoherentEditor::~CoherentEditor()
+    {
+        std::erase(editors, this);
+    }
+
+    void CoherentEditor::DumpAll(const char* reason)
+    {
+        Logger::Log(std::format("Dumping {} memory editors: {}", editors.size(), reason).c_str());
+
+        for (CoherentEditor* editor : editors)
+            editor->DumpMemory();
+    }
+
     void CoherentEditor::DumpMemory()
     {
         // first check if the file exists

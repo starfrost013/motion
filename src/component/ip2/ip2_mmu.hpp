@@ -12,8 +12,10 @@
 #include <base/filesystem/filesystem.hpp>
 #include <component/addrspace.hpp>
 #include <coherent/coherent.hpp>
+#include <coherent/coherent_editor.hpp>
 #include <component/mmu/mmu.hpp>
 #include <component/cpu/cpu.hpp>
+#include <component/ip2/ip2_interrupt.hpp>
 
 namespace Motion
 {
@@ -28,8 +30,17 @@ namespace Motion
     #define MMU_START                       0x36000000
     #define MMU_END                         0x3F000000
 
-    #define PAGETABLE_MAX_PAGES             (1 << 14) // pagenumber is 13 bits but there might be 2 ptes (one supervisor and one user?)
-    #define PAGETABLE_INDEX(x)              0x3B000000 + (x*sizeof(uint32_t))
+    // 17x AM2167-35PC (16384x1) gives 16384 entries of 17 bits, which is exactly the width of
+    // MMU_MASK_ALWAYS_SET below: 13 bits of frame number plus protection, referenced and modified.
+    #define PAGETABLE_MAX_PAGES             (1 << 14)
+
+    // The page number is the 14 bits above the 4KB page offset. Relying on a uint16_t to truncate it
+    // keeps 16 bits, which is two bits too many.
+    #define PAGETABLE_PAGE_MASK             0x3FFF
+
+    // Frame number in a page table entry. This is 13 bits, NOT 14 - see MMU_MASK_ALWAYS_SET.
+    #define PAGETABLE_FRAME_MASK            0x1FFF
+    #define PAGETABLE_INDEX(x)              (0x3B000000 + ((x) * sizeof(uint32_t)))
 
     #define REG_OS_BASE                     0x36000000
     #define REG_STATUS                      0x38000000
@@ -53,6 +64,10 @@ namespace Motion
     #define MMU_SEGMENT_GEOMETRY_ENGINE     0x60000000      // GE
     #define MMU_SEGMENT_FPA                 0xF0000000      // FPA
 
+    // Status register bits. Only the ones something actually uses are named.
+    #define MMU_STATUS_ENABLE_EXTERNAL      0x0010      // enable the external interrupt input
+    #define MMU_STATUS_ENABLE_INTERRUPTS    0x0020      // master interrupt enable
+
     // page masks
 
     #define MMU_MASK_IS_PROTECTED           0x30000000      // page is protected
@@ -65,6 +80,9 @@ namespace Motion
     #define MMU_MASK_ALWAYS_SET             0xF0001FFF      // Bits which mame always sets. these seem to be wrong compared with the implementation 
 
     #define MMU_SEGMENT_GET_ID(x)           ((x >> 28) & 0x0F)
+
+    // A fault storm would bury every other message in the log, so only report the first few.
+    #define IP2MMU_MAX_FAULTS_LOGGED        32
 
     /// The coherent extnension
     class CoherentExtensionIP2MMU : public CoherentExtension
@@ -102,6 +120,20 @@ namespace Motion
             mmuExtension = new CoherentExtensionIP2MMU(this);
             Coherent::RegisterExtension(mmuExtension);
 
+            /*
+                The page table is not in system RAM - it is 64KB of SRAM on the board - so a RAM dump
+                does not contain it. When a process takes an unexpected fault this is the first thing
+                worth looking at, so give it an editor of its own. Entries are host order here, not
+                the big endian the guest sees.
+            */
+            CoherentEditor::Settings pagetableSettings;
+            pagetableSettings.buf = (uint8_t*)pagetable;
+            pagetableSettings.bufSize = sizeof(pagetable);
+            pagetableSettings.name = "IP2 Page Table";
+
+            pagetableEditor = new CoherentEditor(this, pagetableSettings);
+            Coherent::RegisterExtension(pagetableEditor);
+
             mmuChannel = LogChannel(MMU_LOG_CHANNEL_NAME, ConsoleColor::BrightCyan, ConsoleColor::White);
             Logger::AddChannel(mmuChannel);
             logEnabled = logIP2MMU->GetValue();
@@ -112,6 +144,7 @@ namespace Motion
 
         void Shutdown() override
         {
+            delete pagetableEditor;
             delete mmuExtension;
             ComponentMMU::Shutdown();
         }
@@ -136,6 +169,7 @@ namespace Motion
         uint16_t parity = 0x0;
         uint16_t multibusProtect = 0x0;
         uint32_t pagetable[PAGETABLE_MAX_PAGES] = {0};
+        int32_t faultsLogged = 0;
         uint16_t textdataBase = 0x0;
         uint16_t textdataLimit = 0x0;
         uint16_t stackBase = 0x0;
@@ -145,7 +179,9 @@ namespace Motion
 
     private: 
         CoherentExtensionIP2MMU* mmuExtension; 
+        CoherentEditor* pagetableEditor = nullptr;
         ComponentCPU* cpu = nullptr;
+        IP2Interrupt* interrupts = nullptr;
         LogChannel mmuChannel;
 
     };

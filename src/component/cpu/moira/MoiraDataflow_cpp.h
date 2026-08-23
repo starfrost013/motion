@@ -217,13 +217,33 @@ Moira::readOp(int n, u32 *ea, u32 *result)
             // Compute effective address
             *ea = computeEA<C, M, S, F>(n);
 
-            // Emulate -(An) register modification
-            updateAnPD<M, S>(n);
-
             // Read from effective address
             *result = readM<C, M, S, F>(*ea);
 
-            // Emulate (An)+ register modification
+            /* Note where An is before moving it. This access has already succeeded, but a later
+             * one in the same instruction can still bus error - the destination of a byte copy
+             * loop landing on a page that is not resident yet - and the fault handler restarts
+             * the whole instruction. See anRollback.
+             */
+            if constexpr (M == Mode::PD || M == Mode::PI) {
+
+                if (anRollbackCount < (int)std::size(anRollback)) {
+
+                    anRollback[anRollbackCount].an = n;
+                    anRollback[anRollbackCount].value = readA(n);
+                    anRollbackCount++;
+                }
+            }
+
+            /* The -(An) decrement has to happen after the access, not before it.
+             * computeEA has already returned An - size without touching An, so this changes
+             * nothing about what the instruction does when the access succeeds - but when it
+             * bus errors, An is still where it started and the fault handler can restart the
+             * instruction. Decrementing first leaves a push that faulted on a stack page that
+             * is not resident yet with An already moved, and the restart moves it again.
+             */
+            // Emulate -(An) and (An)+ register modification
+            updateAnPD<M, S>(n);
             updateAnPI<M, S>(n);
     }
 }
@@ -244,13 +264,18 @@ Moira::writeOp(int n, u32 val)
             // Compute effective address
             u32 ea = computeEA<C, M, S>(n);
 
-            // Emulate -(An) register modification
-            updateAnPD<M, S>(n);
-
             // Write to effective address
             writeM<C, M, S, F>(ea, val);
 
-            // Emulate (An)+ register modification
+            /* The -(An) decrement has to happen after the access, not before it.
+             * computeEA has already returned An - size without touching An, so this changes
+             * nothing about what the instruction does when the access succeeds - but when it
+             * bus errors, An is still where it started and the fault handler can restart the
+             * instruction. Decrementing first leaves a push that faulted on a stack page that
+             * is not resident yet with An already moved, and the restart moves it again.
+             */
+            // Emulate -(An) and (An)+ register modification
+            updateAnPD<M, S>(n);
             updateAnPI<M, S>(n);
     }
 }
@@ -494,8 +519,12 @@ Moira::readI()
 template <Core C, Size S, Flags F> void
 Moira::push(u32 val)
 {
+    /* Same reason as the -(An) handling in readOp/writeOp: move the stack pointer only once the
+     * write has actually landed, so a push onto a page that is not resident yet can be restarted
+     * by the fault handler. bsr, jsr, link and pea all push through here.
+     */
+    write<C, AddrSpace::DATA, S, F>(U32_SUB(reg.sp, S), val);
     reg.sp -= S;
-    write<C, AddrSpace::DATA, S, F>(reg.sp, val);
 }
 
 template <Core C, Size S, Flags F> u32
@@ -580,6 +609,16 @@ template <Core C, Flags F, int delay> void
 Moira::fullPrefetch()
 {
     assert(!misaligned<C>(reg.pc));
+
+    /* pc0 has to be updated here and not just in the prefetch() below. This is where execution
+     * arrives after a jump, an RTE or an exception, so the read on the next line is the first
+     * fetch of the instruction at the new pc. If that read faults, pc0 is what tells the fault
+     * handler where to restart, and leaving it pointing at the instruction that jumped here
+     * restarts that one instead - in supervisor code returned from by an RTE, in user mode.
+     * prefetch() assigns it the same value on the way out, so nothing changes when the read
+     * succeeds.
+     */
+    reg.pc0 = reg.pc;
 
     queue.irc = (u16)read<C, AddrSpace::PROG, Word>(reg.pc);
     if (delay) SYNC(delay);

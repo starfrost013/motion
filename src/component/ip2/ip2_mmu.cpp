@@ -41,7 +41,7 @@ namespace Motion
         case REG_MULTIBUS_PROTECT:
             ret = multibusProtect;
             break;
-        case REG_PAGETABLE_BASE ... PAGETABLE_INDEX(PAGETABLE_MAX_PAGES):
+        case REG_PAGETABLE_BASE ... PAGETABLE_INDEX(PAGETABLE_MAX_PAGES) - 1:
             if (addr & 2)
                 ret = pagetable[(addr - REG_PAGETABLE_BASE) >> 2] & 0x0000FFFF;
             else
@@ -102,6 +102,15 @@ namespace Motion
                 break;
             case REG_STATUS:
                 status = value;
+
+                // ST_ENABINT is the master interrupt enable. The register lives here but the logic it
+                // gates does not, so hand it over.
+                if (!interrupts)
+                    interrupts = Emulation::GetMachine()->FindComponentByType<IP2Interrupt>();
+
+                if (interrupts)
+                    interrupts->SetEnabled(value & MMU_STATUS_ENABLE_INTERRUPTS);
+
                 break;
             case REG_PARITY:
                 parity = value;
@@ -109,7 +118,7 @@ namespace Motion
             case REG_MULTIBUS_PROTECT:
                 multibusProtect = value;
                 break;       
-            case REG_PAGETABLE_BASE ... PAGETABLE_INDEX(PAGETABLE_MAX_PAGES):
+            case REG_PAGETABLE_BASE ... PAGETABLE_INDEX(PAGETABLE_MAX_PAGES) - 1:
                 index = (addr - REG_PAGETABLE_BASE) >> 2;
         
                 if (addr & 2)
@@ -185,11 +194,16 @@ namespace Motion
             baseValue = osBase;
             limitValue = 0;             // 0 means no limit
         }
-        // map Multibus Memory
         else
         {
-            // these don't seem to use virtual memory, so just ignore them
-            // except for segment 4 (Multibus Memory) which happens to use its own thing
+            /*
+                Only the three RAM segments go through the page map. MAME's mem_map sends segment 3
+                straight to sys_map and segments 4 and 5 straight out to the Multibus, and the IP2
+                schematic agrees - the map RAM sits between the CPU and DRAM, not between the CPU and
+                the backplane. Running segment 4 through the map with a base of zero silently
+                redirected the PROM's Multibus accesses into whatever page table entry happened to
+                match, which is how the Multibus map programming was going missing.
+            */
             *finalAddress = addr;
             return true; 
         }
@@ -201,16 +215,36 @@ namespace Motion
         if (segment == MMU_SEGMENT_GET_ID(MMU_SEGMENT_STACK))
         {
             // bits 23-12
-            pageNumber = (addr >> 12) ^ 0x3FFF;
-            finalPageNumber = (baseValue - pageNumber) & 0x3FFF;
+            pageNumber = ((addr >> 12) & PAGETABLE_PAGE_MASK) ^ PAGETABLE_PAGE_MASK;
+            finalPageNumber = baseValue - pageNumber;
         }
         else
         {
-            pageNumber = (addr >> 12);
-            finalPageNumber = (baseValue + pageNumber) & 0x3FFF;
+            pageNumber = (addr >> 12) & PAGETABLE_PAGE_MASK;
+            finalPageNumber = baseValue + pageNumber;
         }
 
         bool limitReached = limitValue && pageNumber > limitValue;
+
+        // base + page number can index past the end of the table - osBase is 0x3e00 while the PROM is
+        // running, so any kernel segment address at or above 0x20200000 lands at 0x4000 or beyond.
+        // That is a fault, not something to read out of bounds for, and it must not be masked back
+        // into range either: 0x4000 & 0x3fff is entry 0, which is a perfectly valid mapping and turns
+        // the fault into a silent alias.
+        if (finalPageNumber >= PAGETABLE_MAX_PAGES)
+        {
+            if (faultsLogged < IP2MMU_MAX_FAULTS_LOGGED)
+            {
+                faultsLogged++;
+
+                Logger::Log(LOG_PREFIX_IP2MMU,
+                    std::format("Bus error: {} of 0x{:x} indexes page table entry 0x{:x}, past the end of the table",
+                    isWrite ? "write" : "read", addr, finalPageNumber).c_str(), LogChannels::Warning);
+            }
+
+            return false;
+        }
+
         uint32_t& page = pagetable[finalPageNumber];
 
         bool busError = false;
@@ -222,7 +256,10 @@ namespace Motion
                 || !(page & MMU_MASK_IS_PROTECTED)
                 || ((page & MMU_MASK_IS_PROTECTED) == MMU_MASK_SUPERVISOR_ONLY) && !(cpu->IsPrivilegedMode()))
             {
-                //busError = true; 
+                // These are the conditions MAME's sgi_ip2_device uses, and they match the inputs of the
+                // BERR PAL on sheet 16 of the IP2 schematic: the limit comparator, the two protection
+                // bits out of the map, WRITE, and FC2 for supervisor/user.
+                busError = true; 
             }
 
             if (!busError)
@@ -235,7 +272,10 @@ namespace Motion
                 || (page & MMU_MASK_IS_PROTECTED) == MMU_MASK_READ_ONLY // cannot write to readonly 
                 || ((page & MMU_MASK_IS_PROTECTED) == MMU_MASK_SUPERVISOR_ONLY) && !(cpu->IsPrivilegedMode()))
             {
-                //busError = true; 
+                // These are the conditions MAME's sgi_ip2_device uses, and they match the inputs of the
+                // BERR PAL on sheet 16 of the IP2 schematic: the limit comparator, the two protection
+                // bits out of the map, WRITE, and FC2 for supervisor/user.
+                busError = true; 
             }
 
             if (!busError)
@@ -244,15 +284,28 @@ namespace Motion
 
         if (busError)
         {
-            Logger::Log(LOG_PREFIX_IP2MMU, 
-                std::format("***** VERY BIG PROBLEM ***** Bus error @ segment {} offset {} (haven't figured out the interface yet)", 
-                segment, (addr << 2)).c_str(), LogChannels::FatalError);
+            // Not fatal any more: the CPU turns this into exception vector 2 and the OS gets to deal
+            // with it. Rate limited because a fault storm would otherwise bury every other message.
+            if (faultsLogged < IP2MMU_MAX_FAULTS_LOGGED)
+            {
+                faultsLogged++;
+
+                Logger::Log(LOG_PREFIX_IP2MMU,
+                    std::format("Bus error: {} of unmapped page 0x{:x} (segment {}, pte index 0x{:x}, pte 0x{:08x}){}",
+                    isWrite ? "write" : "read", addr, segment, finalPageNumber, page,
+                    (faultsLogged == IP2MMU_MAX_FAULTS_LOGGED) ? " - further faults will not be logged" : "").c_str(),
+                    LogChannels::Warning);
+            }
 
             return false; 
         }
         
         // calculate a real physical ram address with 13...0 page adn teh bottom1 0 bits of the real address
-        *finalAddress = (page & 0x3FFF) << 12 | (addr & 0x1FFF);
+        // Pages are 4KB - the page number is addr >> 12, and the PROM fills 256 PTEs per megabyte,
+        // so the offset kept from the virtual address has to be 12 bits. With a 13-bit mask, bit 12
+        // of the virtual address gets ORed into bit 12 of the frame number: harmless while the PROM
+        // maps physical == virtual, fatal as soon as the kernel installs a real mapping.
+        *finalAddress = (page & PAGETABLE_FRAME_MASK) << 12 | (addr & 0xFFF);
         //Logger::Log(LOG_PREFIX_IP2MMU, std::format("Translated virtual address {:x} to physical address {:x}", addr, *finalAddress).c_str(), LogChannels::Debug);
         return true; 
     }

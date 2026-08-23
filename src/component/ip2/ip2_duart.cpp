@@ -108,9 +108,11 @@ namespace Motion
                 ret = duart.isr;
                 break;
             case DUART_READ_COUNTER_UPPER:
+                UpdateCounter(duartId);
                 ret = (duart.counter >> 8) & 0xFF;
                 break;
             case DUART_READ_COUNTER_LOWER:
+                UpdateCounter(duartId);
                 ret = duart.counter & 0xFF;
                 break;
             case DUART_READ_1X16X:
@@ -122,10 +124,15 @@ namespace Motion
                 ret = 0xFF;
                 break;
             case DUART_READ_START_COUNTER_CMD:
+                // "the counter/timer is loaded with the value in CTUR/CTLR and begins counting down"
                 duart.counter = duart.counterPreset;
+                duart.counterStartNs = Chrono_GetTicksNS(Chrono_GetTime());
                 duart.counterRunning = true;
                 break;
             case DUART_READ_STOP_COUNTER_CMD:
+                // Latch where the counter got to before stopping it - the whole point of the command
+                // is that the host then reads CTU/CTL to see how long something took.
+                UpdateCounter(duartId);
                 duart.counterRunning = false;
                 duart.isr &= ~DUART_INT_COUNTER_READY;
                 mustUpdateInterrupts = true;
@@ -444,7 +451,8 @@ namespace Motion
         UARTChannel& chanA = duart.channels[0];
         UARTChannel& chanB = duart.channels[1];
 
-        uint8_t isr = duart.isr & (DUART_INT_INPUT_PORT_CHANGE | DUART_INT_DELTA_BREAK_A | DUART_INT_DELTA_BREAK_B);
+        uint8_t isr = duart.isr & (DUART_INT_INPUT_PORT_CHANGE | DUART_INT_DELTA_BREAK_A
+            | DUART_INT_DELTA_BREAK_B | DUART_INT_COUNTER_READY);
 
         if (chanA.status & DUART_STATUS_TRANSMITTER_READY)
             isr |= DUART_INT_TXRDYA;
@@ -460,24 +468,97 @@ namespace Motion
         if (rxIntSelectB ? (chanB.status & DUART_STATUS_FIFO_FULL) : (chanB.status & DUART_STATUS_RECEIVER_READY))
             isr |= DUART_INT_RXRDY_FFULLB;
 
-        // counter isn't implemented yet so just do this
-        if (duart.counterRunning)
-            isr |= (duart.isr & DUART_INT_COUNTER_READY);
-
         duart.isr = isr;
 
-        // NOTE: there is no CPU-side interrupt controller wired up anywhere in this emulator yet, so INTRN is
-        // never actually asserted to the CPU - this only keeps ISR/IMR correct for polled access (which is how
-        // the PROM monitor talks to the console anyway) and for the Coherent debug view. Revisit this once
-        // interrupt handling exists on the CPU side.
+        /*
+            INTRN is asserted whenever an unmasked source is pending. Both chips sit on interrupt
+            level 6; which of them is asserting is what picks the vector, and DUART 1 is the one the
+            kernel installs its Xclock handler for.
+        */
+        if (!interrupts)
+            interrupts = Emulation::GetMachine()->FindComponentByType<IP2Interrupt>();
+
+        if (interrupts)
+            interrupts->SetLocalInterrupt(duartId ? IP2_LOCAL_DUART1 : IP2_LOCAL_DUART0,
+                (duart.isr & duart.imr) != 0);
     }
 
     //
     // TICK method + CLOCK
     //
 
+    uint64_t DUART68681::GetCounterTickNs(int32_t duartId)
+    {
+        // ACR[6:4]: 011 counter from X1/16, 110 timer from X1, 111 timer from X1/16. The other four
+        // select the external IP2 pin or one of the transmitter clocks, none of which are connected.
+        switch (DUART_COUNTER_MODE(duarts[duartId].auxControl))
+        {
+            case 3:
+            case 7:
+                return (1000000000ull * 16) / DUART_X1_HZ;
+            case 6:
+                return 1000000000ull / DUART_X1_HZ;
+            default:
+                return 0;
+        }
+    }
+
+    /*
+        Rather than decrementing once per tick - which at 230kHz would mean either a very hot Tick or
+        a counter that lies - work out where the counter must have got to from how long it has been
+        since it was loaded. Reads latch the value first, so the host always sees an exact count.
+    */
+    void DUART68681::UpdateCounter(int32_t duartId)
+    {
+        DUART& duart = duarts[duartId];
+        uint64_t tickNs = GetCounterTickNs(duartId);
+
+        if (!tickNs)
+            return;
+
+        bool isTimer = DUART_COUNTER_MODE_IS_TIMER(duart.auxControl);
+
+        // A timer free runs; a counter only runs between the start and stop commands.
+        if (!isTimer && !duart.counterRunning)
+            return;
+
+        uint64_t now = Chrono_GetTicksNS(Chrono_GetTime());
+
+        if (now < duart.counterStartNs)
+            return;
+
+        uint64_t elapsed = (now - duart.counterStartNs) / tickNs;
+
+        // The counter does not stop at zero, it rolls over and keeps going, so this is deliberately
+        // allowed to wrap - the host reads it as a 16 bit value either way.
+        duart.counter = (uint16_t)(duart.counterPreset - elapsed);
+
+        /*
+            "Counter ready" is set the first time the count passes zero and stays set until the stop
+            counter command clears it. In timer mode there is no stop, so the bit is set once a half
+            period has gone by and the host clears it the same way.
+        */
+        if (elapsed >= duart.counterPreset)
+            duart.isr |= DUART_INT_COUNTER_READY;
+    }
+
     void DUART68681::Tick()
     {
+        /*
+            Keep the counter/timer current. This is what generates the scheduler clock, so a change
+            here has to reach the interrupt logic rather than just sitting in ISR - run the interrupt
+            recompute whenever the counter ready bit moves.
+        */
+        for (int32_t duart = 0; duart < 2; duart++)
+        {
+            uint8_t before = duarts[duart].isr;
+
+            UpdateCounter(duart);
+
+            if (duarts[duart].isr != before)
+                UpdateInterruptState(duart, 0);   // chip level recompute, the channel argument is unused here
+        }
+
         // Each of the 4 channels (2 chips x 2 channels) has its own independent baud rate, so each gets its own
         // pair of rx/tx bit clocks rather than one global clock for the whole component.
         auto ns = Chrono_GetTicksNS(Chrono_GetTime());

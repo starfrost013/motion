@@ -28,13 +28,30 @@ namespace Motion
         { 
             this->settings = settings;
             SetDefaultSettings();
+            editors.push_back(this);
         };
+
+        ~CoherentEditor();
 
         void AddUI() override; 
 
         /// @brief utility method to set the default settings
         void SetDefaultSettings();
+
+        /// @brief Write this editor's buffer out to the dumps folder.
+        void DumpMemory();
+
+        /*
+            Dumping is otherwise only reachable through the editor's menu, which is no use when the
+            machine is being run headless or from a script - and the interesting moment is usually one
+            you cannot click fast enough for anyway. Every editor registers itself here so the whole
+            set can be written out at once, see dumpOnConsoleMatch.
+        */
+        static void DumpAll(const char* reason);
+
     private:
+        inline static std::vector<CoherentEditor*> editors;
+
         Settings settings; 
 
         bool shutupFatalError = false;
@@ -45,6 +62,5 @@ namespace Motion
         /// @brief determines if the current address to be viewed is valid
         bool addressIsValid = true; 
 
-        void DumpMemory();
     }; 
 }

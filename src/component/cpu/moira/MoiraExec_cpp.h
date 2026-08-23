@@ -2405,6 +2405,18 @@ Moira::execJsr(u16 opcode)
             // Jump to new address
             reg.pc = ea;
 
+            /*
+                The return address is on the stack by now, so this fetch must not restart the jsr:
+                doing so pushes it a second time, and every argument the callee then reads through
+                its frame pointer is off by four. It is the one prefetch in the instruction set that
+                follows a side effect which has already committed, so it needs what fullPrefetch
+                does for the branches - pc0 pointing at the target, so a fault on a text page that
+                is not resident yet resumes at the target with the push done once. A real 68020
+                reaches the same place by rerunning only the faulted bus cycle out of a long bus
+                fault frame.
+            */
+            reg.pc0 = reg.pc;
+
             queue.irc = (u16)read<C, AddrSpace::PROG, Word>(ea);
             prefetch<C, POLL>();
             break;
@@ -2458,6 +2470,18 @@ Moira::execJsr(u16 opcode)
 
             // Jump to new address
             reg.pc = ea;
+
+            /*
+                The return address is on the stack by now, so this fetch must not restart the jsr:
+                doing so pushes it a second time, and every argument the callee then reads through
+                its frame pointer is off by four. It is the one prefetch in the instruction set that
+                follows a side effect which has already committed, so it needs what fullPrefetch
+                does for the branches - pc0 pointing at the target, so a fault on a text page that
+                is not resident yet resumes at the target with the push done once. A real 68020
+                reaches the same place by rerunning only the faulted bus cycle out of a long bus
+                fault frame.
+            */
+            reg.pc0 = reg.pc;
 
             queue.irc = (u16)read<C, AddrSpace::PROG, Word>(ea);
             prefetch<C>();
@@ -3288,26 +3312,45 @@ Moira::execMovemRgEa(u16 opcode)
 
         u32 ea = readA(dst);
 
-        for (int i = 15; i >= 0; i--) {
+        /* A 68020 writes An back as it goes, so a bus error partway through this loop - a register
+         * save crossing onto a stack page that is not resident yet - would leave An stranded
+         * halfway and a restart would store the wrong registers at the wrong addresses. Real
+         * hardware stacks a continuation frame and resumes mid-instruction; all we can offer is a
+         * restart, so put An back where the instruction found it and let the whole thing run again.
+         * Nothing observes An between the writes unless the instruction faults, so this changes
+         * nothing on the path where it does not.
+         */
+        const u32 anOnEntry = ea;
 
-            // Only proceed if the mask bit is set
-            if ((mask & (0x8000 >> i)) == 0) continue;
+        try {
 
-            // Check for address error
-            if (misaligned<C, S>(ea)) {
+            for (int i = 15; i >= 0; i--) {
 
-                setFC<M>();
-                readBuffer = mask;
-                writeBuffer = u16(reg.r[i] & 0xFFFF);
-                throw AddressError(makeFrame<AE_INC_PC|AE_WRITE>(U32_SUB(ea, 2)));
+                // Only proceed if the mask bit is set
+                if ((mask & (0x8000 >> i)) == 0) continue;
+
+                // Check for address error
+                if (misaligned<C, S>(ea)) {
+
+                    setFC<M>();
+                    readBuffer = mask;
+                    writeBuffer = u16(reg.r[i] & 0xFFFF);
+                    throw AddressError(makeFrame<AE_INC_PC|AE_WRITE>(U32_SUB(ea, 2)));
+                }
+
+                // Write register contents into memory
+                ea -= S;
+                if constexpr (C == Core::C68020) writeA(dst, ea);
+                writeM<C, M, S, 0>(ea, reg.r[i]);
+                cnt++;
             }
 
-            // Write register contents into memory
-            ea -= S;
-            if constexpr (C == Core::C68020) writeA(dst, ea);
-            writeM<C, M, S, 0>(ea, reg.r[i]);
-            cnt++;
+        } catch (const BusError &) {
+
+            writeA(dst, anOnEntry);
+            throw;
         }
+
         if constexpr (C != Core::C68020) writeA(dst, ea);
 
     } else {
@@ -4762,6 +4805,44 @@ Moira::execRte(u16 opcode)
                     
                     //
                     (void)pop<C, Long>();
+                    break;
+
+                } else if (format == 0b1010) {
+
+                    // Status register
+                    newsr = (u16)pop<C, Word>();
+
+                    // Program counter
+                    newpc = pop<C, Long>();
+
+                    // 1010 | Vector offset
+                    (void)pop<C, Word>();
+
+                    // Internal register
+                    (void)pop<C, Word>();
+
+                    // Special status word
+                    (void)pop<C, Word>();
+
+                    // Instruction pipe stage C
+                    (void)pop<C, Word>();
+
+                    // Instruction pipe stage B
+                    (void)pop<C, Word>();
+
+                    // Data cycle fault address
+                    (void)pop<C, Long>();
+
+                    // Internal registers
+                    (void)pop<C, Word>();
+                    (void)pop<C, Word>();
+
+                    // Data output buffer
+                    (void)pop<C, Long>();
+
+                    // Internal registers
+                    (void)pop<C, Word>();
+                    (void)pop<C, Word>();
                     break;
 
                 } else if (format == 0b1011) {

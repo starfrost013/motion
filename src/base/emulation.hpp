@@ -24,6 +24,12 @@ namespace Motion
     
     extern Cvar* machineName;
 
+    // The line the IRIS uses for its console. Line 0 is the other DUART channel.
+    #define EMULATION_CONSOLE_SERIAL_LINE           1
+
+    // How long a bare \p in consoleInput waits, in seconds.
+    #define EMULATION_CONSOLE_INPUT_DEFAULT_PAUSE   5
+
     class Emulation
     {
     public: 
@@ -66,5 +72,31 @@ namespace Motion
 
         /// @brief initialises the machine based on the convar values.
         inline static void InitMachine();
+
+        /// @brief Wall clock seconds since the first time anything asked, i.e. roughly since startup.
+        static int64_t SecondsSinceStart();
+
+        /// @brief Write every memory editor out once dumpAfterSeconds have passed, if it is set.
+        static void CheckTimedDump();
+
+        /// @brief One run of text to type, and how long to wait afterwards before the next.
+        struct ConsoleInputChunk
+        {
+            std::string text;
+            int32_t pauseAfterSeconds = 0;
+        };
+
+        /// @brief Type consoleInput at the guest once consoleInputAfterSeconds have passed.
+        static void CheckConsoleInput();
+
+        static std::vector<ConsoleInputChunk> ParseConsoleInput(const char* text);
+
+        inline static Cvar* dumpAfterSeconds = nullptr;
+        inline static bool timedDumpDone = false;
+
+        inline static Cvar* consoleInput = nullptr;
+        inline static Cvar* consoleInputAfterSeconds = nullptr;
+        inline static int32_t consoleInputSent = 0;
+        inline static int64_t consoleInputNextSecond = -1;
     };
 }

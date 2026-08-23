@@ -26,13 +26,6 @@ namespace Motion
         mappingMultibus.component = this;
 
         AddrSpace::AddMapping(mappingMultibus);
-        
-        AddrSpaceMapping mappingPaging = AddrSpaceMapping();
-        mappingPaging.startAddr = MULTIBUS_PAGING_START;
-        mappingPaging.endAddr = MULTIBUS_PAGING_END;
-        mappingPaging.component = this;
-
-        AddrSpace::AddMapping(mappingPaging);
 
         // map ip2 segment 5 (multibus IO)
 
@@ -43,6 +36,15 @@ namespace Motion
 
         AddrSpace::AddMapping(mappingIo);
 
+        /*
+            There used to be a second mapping here that pointed the top megabyte of physical RAM at
+            this component, so that bus masters writing "Multibus memory" landed somewhere. That was
+            standing in for the slave map, and it only worked because the PROM happens to program the
+            map to point at exactly that megabyte. It also meant the CPU could not reach the backplane
+            through segment 4 at all, which is where the PROM reads a freshly DMAed kernel back from.
+            DecodeSlave does the real thing now.
+        */
+
         // find the memory so we can use it
         if (!memory)
             memory = Emulation::GetMachine()->FindComponentByType<Memory>();
@@ -50,42 +52,26 @@ namespace Motion
         // guaranteed, the CPU Initialises before this.
         if (!cpu)
             cpu = Emulation::GetMachine()->FindComponentByType<ComponentCPU>();
-
-        // a TEMPORARY kludge. at some point we need to ***TELL*** the memory where multibus is
-        // multibus memory is re-pageable but our model does not really let us remap memory that easily.
-        // the last 0x80000 is translated to other addresses as its used as a generic buffer.
-
-        AddrSpaceMapping* memMapping = AddrSpace::GetMapping(0);
-        
-        // no physical memory
-        if (!memMapping->endAddr)
-        {
-            Logger::Log(MULTIBUS_LOG_PREFIX, "No physical memory, multibus won't work anyway, skipping rest of init", LogChannels::Warning);
-            return;
-        }
-
-        AddrSpaceMapping mappingMultibusMemory = AddrSpaceMapping();
-
-        mappingMultibusMemory.startAddr = multibusMemoryStart = memMapping->endAddr - 0x100000;
-        mappingMultibusMemory.endAddr = multibusMemoryEnd = memMapping->endAddr;
-        mappingMultibusMemory.component = this; 
-
-        // kludge to make memory test pas
-        pageTable[0] = multibusMemoryStart >> 12;
-        pageTable[1] = (multibusMemoryStart >> 12) + 1;
-
-        AddrSpace::AddMapping(mappingMultibusMemory);
     }
 
-    void Multibus::FireMultibusIRQ(int32_t number)
+    /*
+        The eight Multibus interrupt lines are shared, open collector, and they do not map one to one
+        onto the CPU's seven levels - 0 and 1 both come out on level 1. The IP2 interrupt logic owns
+        that mapping and the priority decode, so just hand the line state over.
+    */
+    void Multibus::SetMultibusIRQ(int32_t number, bool asserted)
     {
-        if (number > MULTIBUS_NUM_IRQ)
+        if (number < 0 || number >= MULTIBUS_NUM_IRQ)
         {
-            Logger::Log(MULTIBUS_LOG_PREFIX, std::format("Tried to fire invalid IRQ #{}", number).c_str(), LogChannels::Warning);
+            Logger::Log(MULTIBUS_LOG_PREFIX, std::format("Tried to drive invalid IRQ #{}", number).c_str(), LogChannels::Warning);
             return;
         }
 
-        cpu->SetIRQLine(number);
+        if (!interrupts)
+            interrupts = Emulation::GetMachine()->FindComponentByType<IP2Interrupt>();
+
+        if (interrupts)
+            interrupts->SetMultibusIRQ(number, asserted);
     }
 
     // is this stuff even faster 
@@ -95,8 +81,8 @@ namespace Motion
         if (!lastSlotRead)
             return false;
 
-        return ((addr >= lastSlotRead->memStart && addr <= lastSlotRead->memEnd)
-            || (addr >= lastSlotRead->ioStart && addr <= lastSlotRead->ioEnd));
+        return (addr >= lastSlotRead->ioStart
+        && addr <= lastSlotRead->ioEnd);
     }
 
     bool Multibus::UseCachedWriteSlot(size_t addr)
@@ -161,8 +147,9 @@ namespace Motion
         if (slot.memStart
         && slot.memEnd)
         {
-            slot.memStart = (multibusMemoryEnd - 0x100000) + (slot.memStart & 0xFFFFF);
-            slot.memEnd = (multibusMemoryEnd - 0x100000) + (slot.memEnd & 0xFFFFF);
+            // a card's memory window is a backplane address, which the CPU reaches through segment 4
+            slot.memStart = MULTIBUS_MEMORY_START + (slot.memStart & MULTIBUS_ADDRESS_MASK);
+            slot.memEnd = MULTIBUS_MEMORY_START + (slot.memEnd & MULTIBUS_ADDRESS_MASK);
         }
 
         if (!slot.memStart && !slot.memEnd && !slot.ioStart && !slot.ioEnd)
@@ -187,126 +174,226 @@ namespace Motion
         return true; 
     }   
 
+    /*
+        Nothing on the backplane claimed this address, so the IP2 answers for it itself: the first
+        megabyte of Multibus memory is a window onto system RAM through the slave map, and the second
+        is the map SRAM. Anything else is a hole - nothing drives DSACK, the cycle times out and BERR
+        is asserted. The PROM relies on that: gl2_probe decides whether a GF2 is fitted by reading the
+        FBC flags at 0x50002400 and seeing whether it bus errors.
+    */
+    void Multibus::LogUnmapped(const char* what, size_t addr, bool isWrite, uint32_t value)
+    {
+        if (unmappedLogged >= MULTIBUS_MAX_UNMAPPED_LOGGED)
+            return;
+
+        unmappedLogged++;
+
+        std::string tail = (unmappedLogged == MULTIBUS_MAX_UNMAPPED_LOGGED)
+            ? " - further unmapped Multibus accesses will not be logged" : "";
+
+        if (isWrite)
+            Logger::Log(MULTIBUS_LOG_PREFIX, std::format("Multibus::{}: Unmapped Multibus write of 0x{:x} to 0x{:x}{}",
+                what, value, addr, tail).c_str(), LogChannels::Warning);
+        else
+            Logger::Log(MULTIBUS_LOG_PREFIX, std::format("Multibus::{}: Unmapped Multibus read from 0x{:x}{}",
+                what, addr, tail).c_str(), LogChannels::Warning);
+    }
+
+    Multibus::SlaveTarget Multibus::DecodeSlave(size_t addr, size_t* target)
+    {
+        if (addr < MULTIBUS_MEMORY_START || addr > MULTIBUS_MEMORY_END)
+            return SlaveTarget::None;
+
+        size_t busAddr = addr - MULTIBUS_MEMORY_START;
+
+        if (busAddr <= MULTIBUS_SLAVE_WINDOW_END)
+        {
+            if (!memory)
+                return SlaveTarget::None;
+
+
+            size_t entry = busAddr >> MULTIBUS_SLAVE_PAGE_SHIFT;
+
+            *target = ((size_t)(slaveMap[entry] & MULTIBUS_SLAVE_FRAME_MASK) << MULTIBUS_SLAVE_PAGE_SHIFT)
+                | (busAddr & MULTIBUS_SLAVE_PAGE_MASK);
+
+            return SlaveTarget::Ram;
+        }
+
+        if (busAddr <= MULTIBUS_SLAVE_MAP_END)
+        {
+            // every address inside a 4KB block selects the same entry
+            *target = (busAddr - MULTIBUS_SLAVE_MAP_START) >> MULTIBUS_SLAVE_PAGE_SHIFT;
+            return SlaveTarget::Map;
+        }
+
+        return SlaveTarget::None;
+    }
+
     uint8_t Multibus::Read8(size_t addr) 
     {
         if (!UseCachedReadSlot(addr))
-            SetCachedReadMapping(addr);
+            if (!SetCachedReadMapping(addr))
+            {
+                size_t target = 0;
 
-        // if no lastslot read, we don't have anytihng to read.
+                switch (DecodeSlave(addr, &target))
+                {
+                    case SlaveTarget::Ram:
+                        return memory->Read8(target);
+                    case SlaveTarget::Map:
+                        return (uint8_t)((addr & 1) ? (slaveMap[target] & 0xFF) : (slaveMap[target] >> 8));
+                    default:
+                        break;
+                }
 
-        if (lastSlotRead)
+                AddrSpace::SignalFault(addr, false);
+
+                LogUnmapped("Read8", addr, false, 0);
+                return 0x00;
+            }
+
             return lastSlotRead->component->Read8(addr);
-
-        if (addr < MULTIBUS_IO_START)
-            return memory->Read8(TranslateAddress(addr)); 
-        else if (addr >= MULTIBUS_IO_START && !lastSlotWritten)
-        {
-            Logger::Log(MULTIBUS_LOG_PREFIX, std::format("Multibus::Read8 - invalid I/O read from 0x{:x}", addr).c_str(), LogChannels::Warning);
-        }
-        return 0xFF;
     }
 
     uint16_t Multibus::Read16(size_t addr)
     {
         if (!UseCachedReadSlot(addr))
-            SetCachedReadMapping(addr);
+            if (!SetCachedReadMapping(addr))
+            {
+                size_t target = 0;
 
-        // if no lastslot read, we don't have anytihng to read.
+                switch (DecodeSlave(addr, &target))
+                {
+                    case SlaveTarget::Ram:
+                        return memory->Read16(target);
+                    case SlaveTarget::Map:
+                        return slaveMap[target];
+                    default:
+                        break;
+                }
 
-        if (lastSlotRead)
-            return lastSlotRead->component->Read16(addr);
+                AddrSpace::SignalFault(addr, false);
 
-        if (addr < MULTIBUS_IO_START)
-            return memory->Read16(TranslateAddress(addr)); 
-        else if (addr >= MULTIBUS_IO_START && !lastSlotWritten)
-            Logger::Log(MULTIBUS_LOG_PREFIX, std::format("Multibus::Read16 - invalid I/O read from 0x{:x}", addr).c_str(), LogChannels::Warning);
-            
-        return 0xFF;
+                LogUnmapped("Read16", addr, false, 0);
+                return 0x00;
+            }
+
+        return lastSlotRead->component->Read16(addr);
     }
 
     uint32_t Multibus::Read32(size_t addr) 
     {
         if (!UseCachedReadSlot(addr))
-            SetCachedReadMapping(addr);
+            if (!SetCachedReadMapping(addr))
+            {
+                size_t target = 0;
 
-        // if no lastslot read, we don't have anytihng to read.
+                switch (DecodeSlave(addr, &target))
+                {
+                    case SlaveTarget::Ram:
+                        return memory->Read32(target);
+                    case SlaveTarget::Map:
+                        return (uint32_t)(slaveMap[target] << 16 | slaveMap[target]);
+                    default:
+                        break;
+                }
 
-        if (lastSlotRead)
-            return lastSlotRead->component->Read32(addr);
+                AddrSpace::SignalFault(addr, false);
 
-        if (addr < MULTIBUS_IO_START)
-            return memory->Read32(TranslateAddress(addr)); 
-        else if (addr >= MULTIBUS_IO_START && !lastSlotWritten)
-            Logger::Log(MULTIBUS_LOG_PREFIX, std::format("Multibus::Read32 - invalid I/O read from 0x{:x}", addr).c_str(), LogChannels::Warning);
+                LogUnmapped("Read32", addr, false, 0);
+                return 0x00;
+            }
 
-        return 0xFF;
+        return lastSlotRead->component->Read32(addr);
     }
 
     void Multibus::Write8(size_t addr, uint8_t value) 
     {
         if (!UseCachedWriteSlot(addr))
-            SetCachedWriteMapping(addr);
+            if (!SetCachedWriteMapping(addr))
+            {
+                size_t target = 0;
 
-        if (lastSlotWritten)
-            lastSlotWritten->component->Write8(addr, value); 
-             
-        if (addr < MULTIBUS_IO_START)
-            memory->Write8(TranslateAddress(addr), value); 
-        else if (addr >= MULTIBUS_IO_START && !lastSlotWritten)
-            Logger::Log(MULTIBUS_LOG_PREFIX, std::format("Multibus::Write8 - invalid I/O write of 0x{:x} to 0x{:x}", value, addr).c_str(), LogChannels::Warning);
+                switch (DecodeSlave(addr, &target))
+                {
+                    case SlaveTarget::Ram:
+                        memory->Write8(target, value);
+                        return;
+                    case SlaveTarget::Map:
+                        slaveMap[target] = (addr & 1)
+                            ? (uint16_t)((slaveMap[target] & 0xFF00) | value)
+                            : (uint16_t)((slaveMap[target] & 0x00FF) | (value << 8));
+                        return;
+                    default:
+                        break;
+                }
+
+                AddrSpace::SignalFault(addr, true);
+
+                LogUnmapped("Write8", addr, true, value);
+                return;
+            }
+            
+        lastSlotWritten->component->Write8(addr, value);
     }
 
     void Multibus::Write16(size_t addr, uint16_t value)
     {
-        if (addr >= MULTIBUS_PAGING_START
-        && addr <= MULTIBUS_PAGING_END)
-        {
-            UpdatePTEntry(addr, value);
-            return;
-        }
-
         if (!UseCachedWriteSlot(addr))
-            SetCachedWriteMapping(addr);
+            if (!SetCachedWriteMapping(addr))
+            {
+                size_t target = 0;
 
-        if (lastSlotWritten)
-            lastSlotWritten->component->Write16(addr, value); 
-                           
-        if (addr < MULTIBUS_IO_START)
-            memory->Write16(TranslateAddress(addr), value); 
-        else if (addr >= MULTIBUS_IO_START && !lastSlotWritten)
-            Logger::Log(MULTIBUS_LOG_PREFIX, std::format("Multibus::Write16 - invalid I/O write of 0x{:x} to 0x{:x}", value, addr).c_str(), LogChannels::Warning);
+                switch (DecodeSlave(addr, &target))
+                {
+                    case SlaveTarget::Ram:
+                        memory->Write16(target, value);
+                        return;
+                    case SlaveTarget::Map:
+                        slaveMap[target] = value;
+                        return;
+                    default:
+                        break;
+                }
+
+                AddrSpace::SignalFault(addr, true);
+
+                LogUnmapped("Write16", addr, true, value);
+                return;
+            }
+
+        lastSlotWritten->component->Write16(addr, value);
     }
     
     void Multibus::Write32(size_t addr, uint32_t value)
     {
         if (!UseCachedWriteSlot(addr))
-            SetCachedWriteMapping(addr);
+            if (!SetCachedWriteMapping(addr))
+            {
+                size_t target = 0;
 
-        if (lastSlotWritten)
-            lastSlotWritten->component->Write32(addr, value); 
-                           
-        if (addr < MULTIBUS_IO_START)
-            memory->Write32(TranslateAddress(addr), value); 
-        else if (addr >= MULTIBUS_IO_START && !lastSlotWritten)
-            Logger::Log(MULTIBUS_LOG_PREFIX, std::format("Multibus::Write32 - invalid I/O write of 0x{:x} to 0x{:x}", value, addr).c_str(), LogChannels::Warning);
+                switch (DecodeSlave(addr, &target))
+                {
+                    case SlaveTarget::Ram:
+                        memory->Write32(target, value);
+                        return;
+                    case SlaveTarget::Map:
+                        slaveMap[target] = (uint16_t)value;
+                        return;
+                    default:
+                        break;
+                }
+
+                AddrSpace::SignalFault(addr, true);
+
+                LogUnmapped("Write32", addr, true, value);
+                return;
+            }
+
+        lastSlotWritten->component->Write32(addr, value);       
     }
 
-    // Multibus Paging
-    size_t Multibus::TranslateAddress(size_t addr)
-    {
-        uint16_t index = ((addr & 0xFFFFF) >> 12) & 0x1FFF;
-        uint32_t realFinalAddr = (pageTable[index] << 12) + (addr & 0xFFF);
-        return realFinalAddr;
-    }
-
-    void Multibus::UpdatePTEntry(size_t addr, uint16_t value)
-    {
-        uint16_t index = ((addr & 0xFFFFF) >> 12) & 0x1FFF;
-        pageTable[index] = value;
-     
-        //Logger::Log(MULTIBUS_LOG_PREFIX, std::format("Multibus page {:x} now points to physical page {:x}", index, value).c_str(), LogChannels::Debug);
-    }
-    
     void Multibus::Shutdown()
     {
         cpu = nullptr;

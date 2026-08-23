@@ -14,6 +14,8 @@
 #include <base/event/event.hpp>
 #include <component/component.hpp>
 
+#include <mutex>
+
 namespace Motion
 {
     /// @brief The number of raw serial lines a ComponentSerial can expose. Sized for two DUART chips, two
@@ -25,6 +27,9 @@ namespace Motion
     // Cap on how much transmitted output a SerialLine remember,s for display purposes.
     #define SERIAL_TXLOG_MAX_SIZE   16384
     #define SERIAL_TXLOG_PURGE_SIZE 4096
+
+    // Console output is echoed to the log a line at a time; this caps a line with no newline in it.
+    #define SERIAL_LOG_LINE_MAX     200
 
     /// @brief a serial receive event
     class SerialReceiveEvent : public Event
@@ -71,6 +76,9 @@ namespace Motion
 
         // NOTE: this might be too slow because we have to tell everything about this event.
         // we can design a custom event system for serial ports if this turns out to be the case. but since serial ports run at low clock it is probably fine
+        /// @brief Dump every memory editor if this line matches dumpOnConsoleMatch.
+        void CheckConsoleTrigger();
+
         void FireReceiveEvent(uint8_t data);
         void FireTransmitEvent(uint8_t data);
         
@@ -90,8 +98,23 @@ namespace Motion
         // At this point i just gave up and used std::string
         std::string txLog;
 
-        // Receive queue - fed directly via AddRxByte()/AddRxString().
+        // Whatever has been sent since the last newline, waiting to be echoed to the log.
+        std::string pendingLine;
+
+        inline static Cvar* dumpOnConsoleMatch = nullptr;
+        inline static bool dumped = false;
+
+        /*
+            Receive queue - fed directly via AddRxByte()/AddRxString().
+
+            Everything that types at a line does so from the render thread (the debugger's serial
+            console, consoleInput), while the chip drains the queue from the emulation thread, so
+            the two ends genuinely do run at once and the queue has to be guarded. Without this the
+            pushes and the pop race and characters go missing, which reads as a flaky terminal
+            rather than as a bug.
+        */
         std::queue<uint8_t> rxQueue;
+        std::mutex rxQueueMutex;
 
 
     };
