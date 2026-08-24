@@ -30,5 +30,7 @@ namespace Motion
         "Mouse Up",
         "Serial Receive Byte",
         "Serial Transmit Byte",
+        "Focus Lost",
+        "Mouse Motion",
     };
 }

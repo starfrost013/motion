@@ -56,6 +56,19 @@ public:
     // Current value on the IPL (Interrupt Priority Level) pins
     u8 ipl {};
 
+    /*
+        Whether the level 7 interrupt currently on the pins has already been taken. Level 7 is not
+        maskable, but it is also not level sensitive: this family recognises it on the *transition*
+        to level 7, so a source that holds the lines there produces exactly one interrupt and not a
+        stream of them.
+
+        Without this, any level 7 source whose latch is cleared by the handler - the IP2's mouse
+        quadrature is one, and its parity error is another - re-enters its own handler before that
+        handler can execute a single instruction, and the machine dies underneath a stack of
+        interrupt frames rather than reading the register that would have dismissed it.
+    */
+    bool nmiTaken {};
+
 protected:
     
     // Number of elapsed cycles since power-up

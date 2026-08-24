@@ -18,7 +18,9 @@ namespace Motion
     void ComponentVRAM::Start()
     {
         size_t vramSize = GetInternalFbSizeX() * GetInternalFbSizeY() * GetBytesPerPixel();
-        vram = new uint8_t[vramSize];
+        // Zeroed, not just allocated. Drawing keeps the bitplanes the write mask leaves clear, so
+        // anything left in here by the allocator would show through every pixel that is ever drawn.
+        vram = new uint8_t[vramSize]();
 
         Logger::Log(std::format("Video RAM size is {} bytes", vramSize).c_str());
 

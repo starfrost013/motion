@@ -17,3 +17,7 @@ profile/ip2_sram.bin
 *.img
 zconf.h
 external/sdl3_image/external
+
+# scratch tooling and test runs - kept in the tree so they survive between
+# sessions, never committed
+scratch/

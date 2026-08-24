@@ -40,6 +40,7 @@ add_executable(motion
     component/ip2/ip2_mmu.cpp
     component/ip2/ip2_duart.cpp
     component/ip2/ip2_rtc.cpp
+    component/ip2/ip2_mouse.cpp
     component/ip2/ip2_mmu_debug.cpp
     coherent/coherent_gui_imgui.cpp
     coherent/coherent_gui_style.cpp
@@ -66,6 +67,8 @@ add_executable(motion
     component/gpu/juniper/dc4/dc4_debug.cpp
     component/gpu/juniper/bp3/bp3_core.cpp
     component/gpu/juniper/gf2/gf2_core.cpp
+    component/gpu/juniper/gf2/gf2_commands.cpp
+    component/gpu/juniper/gf2/gf2_geometry.cpp
     component/gpu/vram.cpp
     render/sdl3/render_sdl3_window.cpp
     base/machine/machine_iris3130.cpp

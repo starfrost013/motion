@@ -175,6 +175,9 @@ namespace Motion
         uint16_t scrMaskX = 0, scrMaskY = 0;
         uint16_t ucr; // update controller reset register?
 
+        /// @brief UCR with its read-only status bits filled in.
+        uint16_t ReadUCR();
+
         CoherentExtensionUC4* extensionUC4;
 
         // the buffers

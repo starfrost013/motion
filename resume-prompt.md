@@ -35,6 +35,15 @@ Nothing has been pushed, and per `CLAUDE.md` nothing should be. Commits carry a
 upstream. `ai-main-backup-20260823` tags the last state of the old `ai-main` if anything needs
 recovering.
 
+**The harness now refuses `git add` and `git commit` outright**, so recent work sits in the working
+tree rather than in a commit. Don't spend time trying to get around it - write the code, build it,
+test it, and say plainly at the end that it is uncommitted so the owner can commit it themselves.
+Leave a prepared commit message in `scratch/`.
+
+**Keep scratch files in `scratch/` inside the repo, not in `/tmp`.** The owner asked for that so the
+tooling survives between sessions; the directory is gitignored and `scratch/README.md` says what is
+in it.
+
 **The last rebase is worth reading before doing the next one.** Upstream's five commits were all one
 Multibus paging refactor, and our second commit rewrote `multibus.cpp` almost entirely, so replaying
 commit by commit meant resolving intermediate states that get overwritten. Re-fitting the *final*
@@ -49,10 +58,15 @@ not carried in - `Write32` dispatching to the slot's `Write16`, and a map write 
 falling through into RAM. `multibus.hpp` carries a note mapping our bus-relative constant names onto
 upstream's absolute ones.
 
-## The goal: something on the graphics screen
+## The goal: something on the graphics screen — reached
 
-**Current state: IRIX boots to a working root shell on the serial console, and the graphics console
-now gets much further than it used to but still does not draw.**
+**Current state: with `+set enableGF2 1`, IRIX boots to a root shell *on the graphics screen*.** The
+SGI banner, the device probe lines, the RESTRICTED RIGHTS LEGEND and a `#` prompt with a cursor all
+render. With the board absent the machine still comes up on the serial line exactly as before.
+
+The remaining visible wrongness on that screen is the known `tset` bug - `setenv: Too few arguments`
+and `wsiri: Command not found` - which is the one-character class of bug described below and is not
+new.
 
 Userland works. `/etc/rc` completes, init reaches its `initdefault` of single user and hands you a
 `#` prompt; `ls`, `cat`, `echo`, `uname`, `env`, pipes and backquote substitution are all correct.
@@ -66,7 +80,9 @@ render_sdl3_core.cpp:284  Emulation::Render(screen)
         -> MainRenderPass -> uploads the texture to the SDL3 GPU swapchain
 ```
 
-VRAM is still 4MB of zeros because nothing in the guest has drawn into it yet.
+VRAM is drawn into by the GF2 now: `gf2_geometry.cpp` writes pixels through `BP3`, and `DC4::Render`
+blits them out. VRAM row 0 is the *bottom* of the screen, which is GL's origin, and `DC4::Render`
+does the flip.
 
 ### How IRIX chooses the graphics console
 
@@ -85,8 +101,15 @@ if (setjmp(jb) == 0) {
 ```
 
 Nothing is patched to prefer serial - `_consduart` is 0 and every GL symbol is present
-(`_gr_init` `0x20048912`, `_gefind` `0x2004862c`, `_havegrconsole`). It falls back purely because
-`gr_init` bus errors and the longjmp fires.
+(`_gr_init` `0x20048912`, `_gefind` `0x2004862c`, `_havegrconsole`). Without the board it falls back
+because `gr_init` bus errors and the longjmp fires; with `+set enableGF2 1` `gr_init` now returns and
+the console moves to the window.
+
+**A consequence worth remembering: once the console moves, kernel `printf` goes to the textport and
+the serial log goes quiet.** A panic in `gr_init` therefore prints to a screen that cannot draw. That
+is exactly how `panic: something wrong with intpixel32!!` hid for a whole session - it was in
+`motion.log` all along, in the middle rather than at the end, because the boot carries on afterwards.
+Grep the log; don't just tail it.
 
 ### What the graphics hardware is
 
@@ -109,7 +132,7 @@ GF2 itself, per the owner:
 * On the IP2 the pipe is not on the backplane: a private bus at segment 6 plus parts of Multibus I/O,
   at a fixed address.
 
-## What was fixed three sessions ago: the 68020 exception path
+## What was fixed four sessions ago: the 68020 exception path
 
 `panic: init died!` was three genuine bugs, all in how a bus error is delivered and returned from.
 They only ever mattered for the *first* fault that had to be recovered from, which is why boot got so
@@ -153,7 +176,7 @@ stack and the stack is demand-grown:
 * `movem` to `-(An)` writes `An` back before *each* store on a 68020, so a fault partway leaves it
   stranded. It now restores `An` if a `BusError` escapes the loop.
 
-## What was fixed two sessions ago: userland
+## What was fixed three sessions ago: userland
 
 Both bugs were the same shape — **an instruction that had already committed a side effect, then took
 a bus error, and got restarted from the top by the fault handler**. The 68020 does not have this
@@ -188,7 +211,7 @@ sides of the stack, the control-flow edge list and the **last 48 retired PCs** f
 (`TraceFatalUserFault` in `mc68020_core.cpp`). That raw PC window is what identified the `jsr` — the
 edge list alone does not show it.
 
-## What was fixed last session: GF2 bring-up
+## What was fixed two sessions ago: GF2 bring-up
 
 `src/component/gpu/juniper/gf2/` is new. It is the board the CPU actually talks to, and its absence
 is why `gr_init` bus errored on its very first register access.
@@ -223,32 +246,306 @@ Implemented:
 Watch out: GL2's constants are not GL1's. `RUNMODE` is `0x31` here and `1` there, and GEflags grew to
 16 bits to carry the microcode addressing.
 
+## What was fixed last session: the graphics console draws
+
+`gf2_commands.cpp` and `gf2_geometry.cpp` are new. **This work is in the working tree, not a commit**
+- the harness refuses `git add`. A prepared commit message is at `scratch/commitmsg.txt`:
+`git add -A src/ && git commit -F scratch/commitmsg.txt`.
+
+The board was one register short of working, and the failure was hidden: `gr_init()` reached
+`gl_getplaneinfo()` and panicked with `something wrong with intpixel32!!` **to the textport**, which
+could not draw.
+
+* **The command stream.** Words at segment 6 are the GE's instruction set, except those wrapped in a
+  `GEpassthru`, which go to the FBC. Framing rules, all easy to get wrong:
+  * `im_passcmd(n, cmd)` is one long, `((GEpassthru | ((n-1) << 8)) << 16) | cmd`, and **n counts the
+    FBC opcode itself**.
+  * `n = 0` encodes as **`0xFF08`** because `(0-1) << 8` wraps. It means lock the pipe (at `GEPORT`)
+    or free it (at `LASTGE`), *not* a 256 word body. Reading it as one swallows everything after it.
+  * **One body can hold several FBC commands** - `gl_getplaneinfo` sends `pixelsetup`, `readpixels`
+    and `pixelsetup` as a single group of eight - so it needs a parameter count per opcode.
+    `FBCloadram` carries its own count; `FBCloadmasks` and `FBCdrawchars` take the rest of the body.
+  * `LASTGE` is `GEPORT - 0x800` in `short*` units, i.e. **`0x60000000`**, and marks the last word of
+    a command. `textport.c` `#undef`s it back to `GEPORT`, so it is not load bearing there.
+  * A long write appears as two 16-bit writes, high half first.
+  * **Check for outstanding operands before checking for a passthru header.** A word only means an
+    opcode when nothing is waiting for it. The textport draws a rectangle at x = 8, and 8's low byte
+    is `GEpassthru`, so testing the other way round eats the rest of that rectangle and resynchronises
+    onto the middle of a command. That was worth 20 dropped fills a boot and a scatter of "unknown
+    FBC opcode" lines that looked like a missing opcode and were not.
+* **The readback FIFO.** A programmed interrupt leaves an answer: read the interrupt code by spying
+  on the output register under `READOUTRUN`, then in `RUNMODE` `FBCdata` reads the head of the FIFO
+  and `FBCclrint` pops it - or every read pops if `AUTOCLEAR` is set in `GEflags`. The interrupt
+  drops when the FIFO drains. It is raised only when there is a result, not for any submitted work.
+* **The plane mask comes from BP3**, so `+set numBitplanes` changes what IRIX believes. With 32
+  fitted it settles on twelve usable and sends `FBCwrten 0x0fff` - a free end-to-end check.
+* **The transform.** Matrix, perspective divide, viewport. The matrix arrives **transposed** (the
+  macro is `im_do_loadmatrixtrans`, the array `orthomattrans`), so a vertex is a column vector. The
+  viewport is 20.8 fixed point built as `((right + left) + 1) << 7` - 8 for the fraction less 1 for
+  the halving - so a 1024 wide screen gives centre and half size both 512.0. Those cancel against the
+  ortho matrix, so the screen clear arrives as `(0.5, 0.5)` to `(1023.5, 767.5)`. **If a change makes
+  the screen clear stop landing on exactly those numbers, the transform is wrong.**
+* **Characters.** Four words of `struct fontchar` each; the glyph is one word per row in the font
+  RAM, leftmost pixel in the top bit, **bottom row first** - the font is stored the way GL addresses
+  the screen. `shiftfontbase()` has already made `offset` an absolute font RAM address. The textport
+  sends the position as a `GEpoint` *one command after* `FBCcharposnabs`, so it arrives transformed.
+
+**The polarity fix that mattered as much as the rest:** `TOKEN_BIT_` has to read **clear**. The
+trailing underscore says active low, but `gf2.h` defines `PIPEISBUSY` as `(FBCflags & TOKEN_BIT_)`
+with no inversion, so a set bit means busy - and `tx_repaint()` gives up and reschedules whenever the
+pipe is busy. Reporting it set meant the textport silently never drew at all.
+
+Three pre-existing bugs in the neighbours only became reachable once the stack came up far enough to
+use them:
+
+* **BP3 had no bounds check on any VRAM access**, and UC4's fill and character draw walk x and y
+  straight out of guest registers. An off-screen rectangle wrote into the host heap. Now guarded.
+* `BP3::Write16` indexed the word array with `addr >> 2` instead of `addr >> 1`.
+* `DC4::Render` started its row loop at `SIZE_Y` rather than `SIZE_Y - 1` and advanced the VRAM
+  address before the read instead of after.
+* VRAM was allocated unzeroed, and drawing keeps the planes the write mask leaves clear.
+
+### A trap worth knowing about: a missing `return` is a wild pointer
+
+`FBCcolor` and `FBCwrten` were written with `break` instead of `return`, so `ExecuteFBCCommand` fell
+off the end without returning a value. At `-O2` GCC assumes that is unreachable, so the caller got
+whatever was in the register as the command length, walked `offset` off into the 78KB GF2 object and
+read garbage as commands. It surfaced as a `free()` on a garbage pointer inside a `std::string`
+destructor that the build had optimised away entirely, on a line that could not execute. **ASan did
+not catch it** - the reads stayed inside the object's own allocation.
+
+What actually found it: compiling `gf2_commands.cpp` with `#pragma GCC optimize("O0")`, which turned
+the SEGV into a clean SIGILL, and then `x/4i $pc` in gdb showing `ud2`. If a crash in this emulator
+points at a line that cannot run, stop trusting the backtrace and go looking for UB.
+
+## What was fixed last session, part two: the keyboard
+
+The graphics console can be typed at now. Five separate things were wrong, and the IRIX side of each
+is in `gl2/gl2/kgl/keyboard.c` and `gl2/gl2/include/kb.h`.
+
+1. **ImGui was eating every keystroke.** The SDL pump gated guest input on `io->WantCaptureKeyboard`,
+   which is true for as long as ImGui has keyboard *navigation* active - and
+   `ImGuiConfigFlags_NavEnableKeyboard` is set, so that is essentially always. It now gates on
+   `io->WantTextInput`, which is the narrower question: is the user typing into a debugger text
+   field? This was the whole reason the keyboard looked dead; everything below it was invisible
+   until this was fixed.
+2. **No break codes.** `KB_SCANCTOUPDN(c)` is `(!((c) & 0x80))`, so **bit 7 clear is a key going
+   down and bit 7 set is it coming up**, and both halves have to be sent. `kb_translate()` keeps
+   shift, control and caps lock purely from them. Only key-down was ever sent, so a modifier latched
+   on forever - and every key whose modifier combination `kb_translate()` does not recognise is
+   dropped by its `default: kb_ringbell(); return;`. That is what "the keyboard stops working until
+   you press shift again" actually is. Caps lock never worked at all, because it toggles on the
+   *up* stroke.
+3. **The modifier bit was inverted and latched.** The old code set bit 7 on the shift key itself,
+   toggling on each press - so pressing shift told IRIX shift had been *released*, and alternate
+   presses left it stuck down. Deleted: shift and control are ordinary keys and IRIX derives the
+   state from their own make and break codes.
+4. **Unmapped keys sent a serial BREAK.** The lookup was `sdlToSgi[key]` on a `std::unordered_map`,
+   and `operator[]` inserts and returns 0 for a key that is not there. Button 0 is the BREAK KEY.
+   It uses `find()` now.
+5. **The first keystroke after boot was swallowed.** "Who are you" is a two byte request, `0x00`
+   then `0x10`, answered with one byte, `0xAA`. It gets asked twice - the PROM at power on and
+   IRIX's own `kb_init()` - and the old code answered only the first. IRIX then took the user's
+   first keystroke as the reply, which is why the console said `Unknown Keyboard - assuming IRIS
+   3000 Keyboard`. If that line ever comes back, the handshake has broken again.
+
+Host auto-repeat is deliberately **not** forwarded: `KeyDownEvent::repeat` was already being set and
+ignored, and passing it on is what turns one deliberate keypress into two or three when the emulator
+stalls long enough for repeats to queue behind it. The cost is that holding a key no longer repeats
+at all. Doing it properly means the emulated keyboard generating its own typematic repeat, which is
+what the real 8048 does.
+
+There is also a `FocusLost` event now, fired from the SDL pump and handled by the keyboard, which
+releases everything still held. Without it, alt-tabbing away mid-keystroke leaves the guest believing
+a modifier is down - the same latch as (2), arriving by a different route.
+
+`+set logKeyboard 1` traces every make and break with its scancode. `scratch/kbtest.sh` boots the
+machine, types two commands at the graphics console with `xdotool` and dumps VRAM, which is the
+whole loop in one command.
+
+## What was fixed this session, part two: the mouse, and a 68020 bug
+
+**The mouse works.** Moving the host pointer over the window moves the guest's: `__mousex` and
+`__mousey` track it tick for tick and `gl_cursorx`/`gl_cursory` follow, clamped to the screen.
+Buttons are wired. `ip2_mouse.cpp` is new and is a quadrature encoder - host movement piles up as a
+signed backlog and is handed over one transition at a time, a fresh interrupt only being offered once
+the guest has read the register that acknowledges the last one.
+
+**Underneath it was a real CPU bug: level 7 was level sensitive and has to be edge triggered.** A
+68020 recognises level 7 on the *transition* to it, not for as long as the pins are held there;
+Moira fired it on every poll. The mouse latch is only cleared by the handler reading the register, so
+`_mouseintr` re-entered itself before it could execute its first instruction and buried the stack
+under interrupt frames. **The symptom is a flood of illegal instructions**, and the fix is a
+`nmiTaken` latch in `Moira::checkForIrq` cleared by `setIPL` when the level comes off 7. Nothing
+below level 7 changed - level 7 could not work at all before this. The parity error is on level 7
+too and would have hit the same wall.
+
+The hardware cursor is implemented as well - `FBCselectcursor`, `FBCdrawcursor`, `FBCundrawcursor`,
+with the screen saved underneath and put back, and **only the planes in the cursor's own write mask**
+saved, because mex puts its pointer in the overlay and does not undraw before repainting under it.
+Whether the pointer's bitmap comes out right is not settled; see `resume-prompt-mex.md`.
+
+Two further bugs turned up while checking whether the pointer looked right, and both had been on the
+screen the whole time:
+
+* **`FBCloadmasks` ignored the font RAM base.** `gl_fontslot()` gives every GL process a 256 word
+  aligned slot and `FBCbaseaddress` says where it starts; mex gets 2048. Loading its glyphs at face
+  value dropped them 2048 words low, which picked the wrong cursor bitmap **and landed mex's font on
+  top of the kernel's** - every digit and every piece of punctuation on the console was garbage
+  (`ib%` for `ib0`, `nswap=%773` for `nswap=17731`) and had been since the textport first drew.
+* **DC4 looked the colour map up with the whole twelve bit pixel.** The RAM is sixteen banks of 256,
+  and the index into a bank is only ever the bottom eight bits; the bank comes from DCflags in
+  multimap mode and from the pixel's top four bits in single map. Indexing with all twelve reaches
+  entries nothing writes, so **every colour index of 256 or more came out black** - including the
+  cursor at 1024, which is why the pointer was drawn correctly and invisible.
+
+**`+set logGF2 1` costs mex about a minute of startup.** With it on, mex reaches `_inchan` at around
+150 seconds rather than 80, so a `dumpAfterSeconds 115` catches it mid-startup and `procs.py` reports
+it SRUN. That is not a hang - give it `dumpAfterSeconds 185` and it is idle at `0x20028302`. This
+session mistook it for a blocker twice. `+set logMouse 1` is cheap and carries the cursor trace.
+
+## What was fixed this session, part one: the window manager draws
+
+**`mex`, the GL2 window manager, runs.** It starts from the graphics console, completes its GL2
+startup, draws a bordered window with a red `console` title bar and the textport inside it, and goes
+to sleep on `_inchan` waiting for input. `scratch/mexshot.png` is that screen.
+**`resume-prompt-mex.md` is the detailed handoff** - what follows is the summary.
+
+Seven things were in the way, every one of them hardware the emulator did not have, and each
+unblocked exactly one step. Nothing about single user mode was ever involved.
+
+1. **`FBCeof` was never executed** - `FBCParamCount` had no entry for opcode 0x26, so it read as an
+   unknown opcode and the parser abandoned the body before the `case` for it could run.
+2. **The board had no interrupt.** `fbc_progintr()`, the only thing that decrements `EOFpending`, has
+   two callers and both are interrupt handlers. GF2 now drives **Multibus line 3** - `ivectors[3]`,
+   patched with `_fbc_intr` by `con_init()` the moment `gr_init()` returns - carrying the **vertical
+   retrace** at 60Hz and the **FBC programmed interrupt**, both gated in GEflags and both active low.
+   `+set gf2RetraceHz 0` turns the retrace off, which separates a fault in that path from one behind
+   it.
+3. **`FBCfeedback`**, the pipe's reverse channel. `gr_switchstate()` hands the hardware from the
+   textport to mex, and `saveeverything()` reads the matrix stack and graphics position back *out* of
+   the pipe to do it. `FBCEOF1` is `0x0108`, which is also a well formed two word passthru header, so
+   the terminator has to be recognised before the parser tests for a passthru.
+4. **`GEreconfigure` had no length** - a configuration byte per chip, ending at the first word whose
+   high byte is `0xff`. Getting that wrong is not a missed command but a lost parser.
+5. **`UCR_VERTICAL` never read set**, so `gl_domapcolors()` could never drain the colour queue and
+   `mapcolor()` spun waiting for room. UC4 reports it permanently now: DC4 does not scan out, so
+   there is no window during which a colour map write would tear. The cost is that `gsync()` never
+   blocks.
+6. **Matrix concatenation did nothing.** The opcodes `0x20`-`0x2f` build a 4x4 matrix a row at a time
+   and multiply it onto the stack; mex positions a window's textport with a single `GEcompletemm3`
+   carrying the window origin. Without it every fill landed at the screen origin - which is what the
+   owner saw as stray lines across the screen. A row of the GE's row vector matrices is a **column**
+   of the transposed ones this emulator keeps, and the collected matrix goes on the **right**.
+7. **The fill rule dropped a row.** Vertices arrive at pixel centres, not area corners, so a span
+   covers the closed interval at both ends - which the x loop already did and the row loop did not.
+   Textport rows abut fifteen pixels apart, so it read as a rule under every line of text, and the
+   screen clear had been leaving its top row unpainted all along.
+
+Two smaller things went in on the way: the DC4 colour map **reads back** now (`getmcolor()` and
+`blink()` need it), and the cursor handshake no longer fires twice per retrace - `fbc_progintr` flips
+FBCflags into READOUTRUN and straight back out again in the middle of servicing an interrupt, and
+both of those writes carry a HOSTFLAG the host is not touching.
+
+**A trap worth knowing about:** `FBC command 0x08` appears four thousand times in a `logGF2` boot and
+is not a bug. The kernel's `gl_WaitForEOF` (`kgl/kgl.c:452`) has no EOF interrupt to wait on and waits
+by filling the pipe instead - `passes = 0x80008`, pushed 76 times, "pipe only holds about 140
+goobies". It is named in `ExecuteFBCCommand` now so it stops reading as an unimplemented command.
+
+## The GUI: where it lives on the disk
+
+**There is a dedicated handoff for this: `resume-prompt-mex.md`.** It has how to run mex, what each
+blocker was, the two behaviours that look like bugs and are not, and what is still missing. Read that
+rather than working from the summary below if the GUI is the job.
+
+**`mex`, the GL2 window manager, is already on the shipped disk** - `/usr/bin/mex`, 100622 bytes, on
+`md0c`, along with `/usr/people/{demos,mexdemos,gifts,guest,tutorial}` and `/usr/lib/gl2/{fonts,
+mexrc}`. Nothing needs installing. It was unreachable only because `/usr` never got mounted.
+
+`scratch/hd/3130-gui.img` fixes that: one file patched, `/etc/rc.s0` gained a
+`/etc/mount /dev/md0c /usr`, and the whole 2754 file userland is up at boot. Run it from
+`scratch/rungui`. **`/etc/rc` is the wrong hook** - it only mounts at init level 2 or 3 and this
+machine's `initdefault` is `s`, so it never reaches those lines; `/etc/rc.s0` is the `sysinit` entry
+and runs every boot. There is no `/etc/fstab` at all, which is why `mount -avt` has nothing to do.
+
+**mex runs.** `main()` forks: the parent `pause()`s until the child signals it and then exits, so the
+shell prompt comes straight back and it looks like nothing happened. The child is the window manager,
+and once it is up it is **SSLEEP on `_inchan`** - a healthy idle window manager waiting for input,
+which it will keep doing until the mouse exists. `3.7/mex/main.c` is the source; the sequence is
+`grioctl(GR_PUTINCHAN)` per channel, `ginit()`, `loadfont`, `softqreset()`, `grioctl(GR_MEWMAN)`.
+
+Worth knowing: `/etc/rc` already contains a mex autostart, `su iris -c '... mex'` gated on `/.mexrc`
+existing - but only under `case \`/bin/uname -t\` in 2300|2300T|3010)`, which a 3130 does not match.
+
+### Where the media is, and what not to use on it
+
+`~/repos/sgiresearch/iris3000` has the **GL2-W3.6 distribution tapes** (`gl2-w3.6+options.tar.gz`):
+"Bootstrap System 05-10-89" holding bootstrap, Standard System root and Standard System usr, and
+"Options 08-22-89" holding NFS, XNS, FORTRAN, Pascal and laser. They are **big-endian binary cpio** -
+`cpio -it -H bin < file` warns about the reverse byte order and then reads them fine. Listings are
+kept in `scratch/hd/tape-*.list`. The tape `/usr` is the same release as the disk `/usr`, so the
+tapes add nothing unless a disk has to be built from scratch. That directory also has the BP3, DC4,
+GF2, UC4 and keyboard firmware dumps, the IP2 PALs, `sgidemos.tar.Z` and `gcc_2.1_SGI3k.tar`.
+
+**`~/repos/rusty-backup` cannot touch this filesystem.** Its SGI support is EFS v1 as IRIX 5.3-6.5
+writes it: it requires `fs_magic` (0x00072959 / 0x0007295A) at superblock offset 28 and rejects
+anything else. IRIX 3.7 is EFS's *ancestor* and has **no magic at all** - `fs_ncg`, `fs_dirty`,
+`fs_time`, then straight into `fs_fname` - so the header is 6 bytes shorter and everything from
+`fs_time` on is displaced. `scratch/efswrite.py` is the tool that understands this one; it rewrites a
+file in place when the new contents still fit the blocks already allocated, which is two edits (the
+data blocks and `di_size`) and needs no allocator.
+
+**The partition table is at image block 0**, not an SGI `dvh` - magic `0x00072959`, the drive name
+("Priam V170") at 0x5c, and partition entries of `{first(4), size(4)}` starting at **offset 0x1a**:
+md0a root at block **119** (17850), md0b swap at 17969 (17731), md0c `/usr` at **35700** (79730).
+
 ## Where the boot stops now
 
 **Serial console (default, `enableGF2` off): nothing blocks it.** Init's `initdefault` is `s`, so it
 reaches a single user root shell on its own in about 8 seconds. Root has no password.
 
-**Graphics console (`+set enableGF2 1`): the FBC bring-up now completes and IRIX selects the
-graphics console, then init never starts.** Zero user-mode faults, kernel idling in `_sched`. The
-sequence that now works end to end is: probe finds the board, microcode loads and verifies,
-`FBC_Reset` and the version check pass, `gefind()` runs its full twelve-chip probe (visible in the
-log as `0x3a00`, `0xff09`, `0x2` twelve times, plus the head-FIFO walking-bit test). Then it stops,
-because nothing executes the geometry stream, so the textport never draws and init blocks on a
-console that never becomes ready.
+**Graphics console (`+set enableGF2 1`): it works.** The board is found, the microcode loads and
+verifies, `FBC_Reset` and the version check pass, `gefind()` runs its twelve-chip probe, the scratch
+RAM tables and the font load, `gl_getplaneinfo` answers, the screen clears, and the textport draws
+the whole boot to a `#` prompt.
 
-That is why it is behind a cvar and off by default: a half finished board is worse than no board,
-because with no board the reset bus errors, the longjmp fires and you get a working serial machine.
+It is still behind a cvar because the geometry side implements only what the textport uses.
 
 ### The next concrete step
 
-Decode the segment 6 command stream into BP3 writes. `gl2cmds.h` is the opcode table
-(`GEmove 0x10`, `GEdraw 0x11`, `GEpoint 0x12`, `GEcurve 0x13`, matrix and viewport ops), and the
-stream is already being logged rather than discarded, so a real trace of exactly what the textport
-asks for is one boot away. The textport draws in screen coordinates, so this does **not** require the
-geometry pipeline to be real first - that is the shortest path from "IRIX selects the graphics
-console" to pixels.
+**Find out what wakes mex.** It is up, it can be pointed at and clicked on, and it still sleeps on
+`_inchan` - moving the mouse does not by itself queue an input event, because `DoQueueValuators` only
+queues a valuator the process asked for with `GR_QDEVICE`. Whether mex is asking, and what it does
+with the answer, is the thing that turns a window manager that draws into one that responds.
+
+After that, in the order it will start to matter:
+
+* **The screen mask.** `FBCmasklist` and `FBCloadviewport` do nothing, so drawing is not clipped to a
+  window. With one window nothing lands outside it; with two overlapping ones it will.
+* **Fill in the FBC command set.** Everything is framed and stepped over correctly, so each command
+  is an isolated piece of work. `FBCdrawcursor`/`FBCundrawcursor`, `FBCbaseaddress` (the font RAM
+  offset), `FBCconfig`, `FBClinewidth`, `FBClinestipple` and `FBCblockfill` are the ones the textport
+  and the cursor actually use. The microcode source in `3.7/gl2/gl2/ucode/` says what each one does.
+* **Real geometry.** Matrix concatenation and the viewport work now, but there is still no clipping
+  and no z-buffer, which is what 3D needs.
+
+### Reading the command stream
+
+`+set logGF2 1` decodes the whole thing: every FBC command with its arguments, every GE command with
+its operands in the format the opcode asked for, the viewport, and one line per polygon fill giving
+its bounds, colour and write mask. That log is the fastest way to see what the guest is asking for.
+
+`+set dumpAfterSeconds 30` writes VRAM out; a short Python script that reads
+`dumps/dump_vrameditor_0000.bin` as host-order 32-bit pixels and prints `#` for colour 7 renders the
+text as ASCII, which is a much better check than squinting at a screenshot. Colour 0 is the page,
+7 is text, 2 is the cursor.
 
 ### The type-ahead bug (serial console)
+
+**Still open, and still on the serial line only** - the graphics console keyboard is a different path
+and does not show it. Worth re-testing now that the keyboard work is in, because "loses or duplicates
+its first character" is the same shape as the swallowed-first-keystroke bug that turned out to be the
+keyboard ID handshake, and nobody has checked whether the serial one has a similarly boring cause.
 
 A line typed while a command is still running loses or duplicates its first character, so `cat` runs
 as `at` and `echo` as `eecho`. Spacing input out (two `\p9` chunks, ~18s) avoids it entirely, which is
@@ -280,7 +577,11 @@ prompt with no trailing newline (`# `, `login:`) never appears in `motion.log` a
   are all restartable now. If another one-byte-off symptom turns up, this is still the first family
   to suspect — the test is whether the instruction commits anything before its *last* memory access.
 * **The GE not bus erroring.** Making segment 6 fault was tried; the guest never touches segment 6,
-  so it changed nothing. Reverted.
+  so it changed nothing. Reverted. (It touches it constantly now that the board is fitted.)
+* **The logger being thread unsafe.** It was the obvious suspect for a heap corruption and it is not
+  the cause - serialising `Logger::Log` with a mutex changed nothing, and so did disabling the log
+  window's post-log hook. Both were tried and backed out. See the missing-`return` note above for
+  what it actually was.
 * **exec's argv/envp block.** argv arrives byte-for-byte correct, and a variable `setenv`'d in csh
   reaches the child intact. `sustring` and `copyout` never fault mid-copy — they `iolock` the user
   pages and copy through a kernel scratch mapping.
@@ -300,8 +601,9 @@ cd build/output/RelWithDebInfo && DISPLAY=:1 ./motion +set skipLauncher 1 +set s
 * Log is `build/output/RelWithDebInfo/motion.log`. A 25s run is ~170 lines and ends with init
   waiting for a run level (silently — see below).
 * **Testing while the owner has an instance open**: both write `motion.log` into the working
-  directory, so run yours from a scratch directory with `assets`, `roms`, `profile` and `motion`
-  symlinked into it rather than killing theirs.
+  directory, so run from **`scratch/run`**, which already has `assets`, `roms`, `profile` and
+  `motion` symlinked relatively out of the build directory, rather than killing theirs. Its
+  `imgui.ini` also has the debugger and log windows collapsed, so the guest screen is visible.
 * **Delete `motion.log` and `dumps/` when you are done with them** — the owner asked to keep the disk
   clear. A full dump set is 21MB and is regenerated in one run.
 * It runs until killed; use `timeout 25`, or 90+ if you want to drive userland. Shutdown segfaults —
@@ -317,8 +619,12 @@ cd build/output/RelWithDebInfo && DISPLAY=:1 ./motion +set skipLauncher 1 +set s
 | `+set logCpuTrace 1` | PC ring, control-flow-edge dump on unmapped access, **full state dump on a user fault in the null guard page** (registers, stack either side of sp, edge list, and the last 48 retired PCs), one-shot kernel-entry map dump, periodic PC+register sample, and abnormal-exception logging. Off by default because it records a PC per instruction. |
 | `+set dumpOnConsoleMatch panic` | Writes **every** memory editor to `dumps/` the first time a guest console line contains the string. This is the headless version of the new Dump Memory menu item. |
 | `+set logIP2MMU 1` | MMU register tracing. |
-| `+set enableGF2 1` | Fit the GF2 board. **Off by default** - with it on IRIX takes the graphics console and init never starts, so the machine has no usable console at all. On for graphics work, off for everything else. |
-| `+set logGF2 1` | GF2 register and geometry pipe tracing, including the segment 6 command stream. |
+| `+set enableGF2 1` | Fit the GF2 board. **Off by default** - with it on IRIX takes the graphics console, which now draws but cannot be typed at, so the serial line stops carrying the boot. On for graphics work, off when you want to drive the machine. |
+| `+set logGF2 1` | GF2 tracing: every FBC command with its arguments, every GE command with its operands decoded per the opcode's format, the viewport, and one line per polygon fill with its bounds, colour and write mask. |
+| `+set gf2RetraceHz 60` | The GF2 vertical retrace rate, on Multibus IRQ 3. **0 turns the interrupt off**, which is the quickest way to separate a fault in the retrace path from one behind it. |
+| `+set logMouse 1` | Every host movement with the backlog it joined, every fiftieth tick the guest acknowledges, and every cursor draw and undraw with the glyph's sixteen words. Cheap - unlike `logGF2`, it does not slow the machine down. |
+| `+set logKeyboard 1` | Every make and break code the emulated keyboard sends, with its scancode. |
+| `+set numBitplanes 8` | How many bitplanes BP3 fits. The GF2 pixel readback answers `gl_getplaneinfo` from this, so IRIX believes it. Default 32, which IRIX caps to twelve usable. |
 | `+set dumpAfterSeconds 35` | Same dump, on a stopwatch instead. Useful because the interesting moments are usually the ones the guest says nothing about — a boot that goes quiet has no console line to match on. |
 | `+set consoleInput 'echo hi\n\p9ls /\n'` + `+set consoleInputAfterSeconds 14` | Types at the guest console. `\n`, `\r`, `\t`, `\\` and `\xNN` work; `\pN` waits N seconds before sending the rest (N is a single digit, so chain `\p9\p9` for longer), which is what makes a conversation possible. |
 
@@ -390,15 +696,20 @@ identified without symbols (the binaries are stripped, `a_syms` is 0).
 `0x1e820 + text + data`, 12 bytes each, string table after. Parsing it turns every address into a
 name and is by far the highest-leverage thing to do first.
 
-Scratch scripts from previous sessions (recreate as needed; `pip download capstone` and unzip the
-wheel, it has m68k support):
+**These already exist in `scratch/`** — that directory is gitignored and kept in the tree precisely so
+they survive between sessions. `scratch/README.md` lists them. The two that matter:
+
+* `kd.py` — disassembles the kernel with **every operand annotated with the symbol it refers to**,
+  which is what turns this from archaeology into reading code. `kd.py <symbol|hexva> [len]` (length
+  defaults to the next symbol), `-w` for hex words, `-s <regex>` to grep symbols, `-a <va>` for every
+  symbol at an address. `scratch/cs/` is the capstone it needs (m68k support); if it goes missing,
+  `pip download capstone` and unzip the wheel.
+* `syms.txt` — the parsed symbol table.
+
+Not currently present, rebuild if wanted:
 
 * `ksyms.py` — parse the symbol table to `syms.txt`
 * `pdis.py` — disassemble the PROM (loads at `0x30000000`)
-* `kd.py` — the one worth rebuilding first. Disassembles the kernel with **every operand annotated
-  with the symbol it refers to**, which is what turns this from archaeology into reading code.
-  `kd.py <symbol|hexva> [len]` (length defaults to the next symbol), `-w` for hex words, `-s <regex>`
-  to grep symbols, `-a <va>` for every symbol at an address.
 
 **Careful with symbol lookup**, two ways:
 
@@ -536,15 +847,28 @@ probes are "does this access bus error", so an over-wide decode invents hardware
 
 ## Known gaps
 
-GF2 exists but only as far as the FBC bring-up (see above) - no geometry pipeline, no FBC command
-execution, no BPC, so no 3D and no graphics console yet.
+GF2 draws the textport, mex's window frame and the hardware cursor, and there is a pointer on the
+screen that follows the mouse. The geometry side carries out load/push/pop matrix,
+**matrix concatenation**, viewport, reconfigure, point and filled polygons; there is no clipping and
+no z-buffer, so there is no 3D. The FBC command set is framed and stepped over correctly but only
+`loadram`, `loadmasks`, `readpixels`, `color`, `wrten`, `charposnabs`, `drawchars`, `eof`, `feedback`,
+`readcharposn`, `baseaddress`, `selectcursor`, `drawcursor` and `undrawcursor` do anything - in
+particular **`masklist` does nothing, so drawing is not clipped to a window**. There is no BPC.
 
-No Ethernet, no Interphase SMD or Storager, no FPA, no DSD write path, no tape or floppy - which
-also means **there is no way to install a different IRIX**: a 3130 was installed from tape, and the
-3.7 tree is source, not media. What *is* worth doing instead is mounting `/usr`, which is a complete
-79,704 block filesystem on `md0c` that never gets mounted because `/etc/fstab` is empty (which is
-also why `/etc/rc` prints `setmnt: malformed input d0a`). `/etc/mount /dev/md0c /usr` at the `#`
-prompt brings in `/usr/bin`, `/usr/people`, the demos and the tutorials.
+**`FBCbaseaddress` is applied to `FBCloadmasks` and to nothing else.** The FBC adds it to what it is
+given; the cursor's address is the exception, and the microcode says so - "NOTE --- cursor font ram
+adr is absolute!" - because the kernel has already added the base itself. Character descriptors are
+absolute too, `shiftfontbase()` having adjusted them in software. If text or a glyph ever lands
+somewhere unexpected, this is the first thing to re-check. The graphics console can be typed at now, but `consoleInput` still drives the
+*serial* line - there is no scripted-input path to the keyboard, which is why `scratch/kbtest.sh`
+drives it with `xdotool` instead. The mouse is wired up now; what is not is any way to drive it from a script, so every mouse test
+here goes through `xdotool`.
+
+No Ethernet, no Interphase SMD or Storager, no FPA, no DSD write path, no tape or floppy. **The
+guest cannot write to the disk at all**, so anything that has to persist is patched into the image
+from the host with `scratch/efswrite.py`. Installation media does exist after all - the GL2-W3.6
+tapes in `~/repos/sgiresearch/iris3000` - but nothing needs installing, because `/usr` on `md0c` is
+the same release and already complete. See the GUI section above.
 
 `AddrSpace::GetMapping` linear-scans an `unordered_map` on every access. `Memory::Start` still writes
 a fake reset vector into RAM at 0 that nothing needs any more. The RTC has 50 bytes of battery backed

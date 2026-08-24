@@ -51,6 +51,15 @@ namespace Motion
 
     #define DC4_COLOUR_RAM_SIZE         49152
 
+    /*
+        The colour RAM is sixteen banks, each 256 entries of red, green and blue - so 768 words a
+        bank. DCMULTIMASK is the driver's name for the index mask and DCIndexToReg for the shift that
+        gets the bank out of a colour, which is how gl_domapcolors addresses it.
+    */
+    #define DC4_COLOURMAP_INDEX_MASK    0xFF
+    #define DC4_COLOURMAP_BANK_MASK     0x0F
+    #define DC4_COLOURMAP_BANK_STRIDE   768
+
     // Single map stuff
     #define DC4_SINGLEMAP_MASK          0xFFF
 
@@ -97,6 +106,10 @@ namespace Motion
 
     private: 
         void UpdateColourmap(size_t addr, uint16_t value);
+        uint16_t ReadColourmap(size_t addr);
+
+        /// @brief Which colour map entry an address in the map window means, or -1 if it is outside it.
+        int32_t ColourmapIndex(size_t addr);
 
         uint16_t GetMultimapAddress(uint32_t offset) { return (((3 * (flags & 0x0F) << 8)) + ((offset - DC4_REG_COLOURMAP_START) >> 1));};
 
