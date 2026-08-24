@@ -5,40 +5,59 @@ Paste the section below into a new session. Everything after the horizontal rule
 ---
 
 We're working on `motion`, an SGI IRIS 3130 emulator at `/home/dani/repos/motion`. Continue from where
-the last session stopped. Note `CLAUDE.md` bars AI-generated code from the repo; the owner has asked
-for code changes directly in-session, so make them, but **leave everything uncommitted for review**
-unless asked otherwise.
+the last session stopped.
+
+`CLAUDE.md` bars AI-generated code from the repository, and that means **never push**. The owner does
+want the code written, and commits on the local `ai-main2` branch are fine and expected - they are
+what makes rebasing onto upstream possible at all. Every commit gets a `Co-Authored-By: Claude`
+trailer so the provenance is obvious and the work is easy to keep out of upstream.
+
+The single most useful thing to know: **the full IRIX 3.7 source tree is on this machine**, at
+`/home/dani/repos/SGi-IRIS-3.7/3.7`. Read it instead of reverse engineering the guest. It has the
+kernel (`sys/ipII` is the IP2-specific half), all of userland, and the complete GL2 graphics stack.
+Caveat: the disk image is GL2-W3.6, one minor version behind the tree, so kernel structures match
+exactly but a userland binary may not.
 
 ## Branches
 
-Work happens on **`ai-main`**, which sits directly on top of `origin/main`:
+Work happens on **`ai-main2`**, which sits directly on top of `origin/main`:
 
 ```
-origin/main  ── upstream (the main dev)
+origin/main  ── upstream (starfrost013, the main dev)
+ danifunker  ── the owner's own fork, has its own main
  main        ── clean mirror of origin/main, tracks it, do not put work here
- ai-main     ── our commits on top          <- work here
+ ai-main     ── the previous AI branch, superseded, kept for reference
+ ai-main2    ── our commits on top of current origin/main   <- work here
 ```
 
-Sync with: `git fetch && git checkout ai-main && git rebase origin/main`.
+Nothing has been pushed, and per `CLAUDE.md` nothing should be. Commits carry a
+`Co-Authored-By: Claude` trailer so the AI-generated work is easy to identify and keep out of
+upstream. `ai-main-backup-20260823` tags the last state of the old `ai-main` if anything needs
+recovering.
 
-A `pre-rebase-backup` tag exists from the last sync; it can be deleted (`git tag -d pre-rebase-backup`).
+**The last rebase is worth reading before doing the next one.** Upstream's five commits were all one
+Multibus paging refactor, and our second commit rewrote `multibus.cpp` almost entirely, so replaying
+commit by commit meant resolving intermediate states that get overwritten. Re-fitting the *final*
+state onto their base once was far cleaner. Only four source files ever collide - `multibus.cpp/hpp`
+and `ip2_mmu.cpp/hpp` - everything else applies untouched.
 
-**When rebasing, expect conflicts in the DSD.** Upstream is still fixing the *old* DSD design (structs
-overlaid on a phantom memory window). Our commits deleted that design and replaced it with a bus
-master that chains WUB→CCB→CIB→IOPB through Multibus RAM, so most upstream DSD hunks are fixes to code
-that no longer exists — take ours, but check each upstream fix is either present or genuinely
-obsolete. Last time only two mattered: `seekp`→`seekg` (already in ours) and the CIB field order
-(already in ours as `iopbPtr` at +8).
+Both sides independently implemented the Multibus slave map and independently made the same MMU fix
+(dropping segment 4 from the page map). Ours is kept because it is a superset: it decodes the map
+SRAM for reads, raises a bus error when nothing answers (device probes are exactly "does this access
+bus error"), and masks master accesses to 24 bits for the 5217. Two upstream bugs are deliberately
+not carried in - `Write32` dispatching to the slot's `Write16`, and a map write at `0x40100000` also
+falling through into RAM. `multibus.hpp` carries a note mapping our bus-relative constant names onto
+upstream's absolute ones.
 
 ## The goal: something on the graphics screen
 
-**Current state: IRIX boots to a working root shell.** `panic: init died!` is gone, demand paging
-works, userland no longer segfaults, `/etc/rc` completes, and init reaches its `initdefault` state of
-single user and hands you a `#` prompt on the console. `ls`, `cat`, `echo`, `uname`, `env`, pipes and
-backquote substitution all work; `ls /etc` prints a correct multi-column listing. The framebuffer is
-still black, because VRAM is still 4MB of zeros — nothing in the guest has drawn yet.
+**Current state: IRIX boots to a working root shell on the serial console, and the graphics console
+now gets much further than it used to but still does not draw.**
 
-The path from VRAM to the window is already complete and working:
+Userland works. `/etc/rc` completes, init reaches its `initdefault` of single user and hands you a
+`#` prompt; `ls`, `cat`, `echo`, `uname`, `env`, pipes and backquote substitution are all correct.
+
+The path from VRAM to the window is complete and working:
 
 ```
 render_sdl3_core.cpp:284  Emulation::Render(screen)
@@ -47,22 +66,50 @@ render_sdl3_core.cpp:284  Emulation::Render(screen)
         -> MainRenderPass -> uploads the texture to the SDL3 GPU swapchain
 ```
 
-**The open question from last time is answered: IRIX does have a text console for the graphics
-screen, and it needs the geometry engine.** The kernel carries a full textport driver
-(`textport.o`, `_tx_open`/`_tx_init`/`_tx_addchars`/`_tx_repaint`/`_tx_drawcursor`, ~0x1400 bytes at
-`0x2004fcb6`). `_tx_drawcursor` does `movea.l #$60001000, a4` and writes 32-bit command words
-(`0x01080015`, `0x01080014`, ...) followed by 16-bit data — that is **segment 6, the GE**, which is
-not emulated at all. Nothing is mapped there, and `AddrSpace` answers an unmapped access with 0xFF
-and a warning rather than a bus error, so those writes vanish silently.
+VRAM is still 4MB of zeros because nothing in the guest has drawn into it yet.
 
-Note the guest does **not** currently touch segment 6 at all (verified: zero accesses through run
-level 2), so the textport is not being driven yet. Working out what makes IRIX choose the graphics
-console over the serial one is the next step; `con_init` (`0x20031ade`) is the place to look. It
-calls `gr_init` inside a `nofault` region and sets `_havegrconsole` if it does not fault, then calls
-`setConsole(1)` unless `_consduart` is set (`_consduart` is 0 in this kernel). Making segment 6 bus
-error was tried and changed nothing, because nothing reaches it.
+### How IRIX chooses the graphics console
 
-## What was fixed the session before last: the 68020 exception path
+`con_init` (`0x20031ade`) forces the console to serial, then tries the graphics path inside a
+`setjmp`/`nofault` guard:
+
+```c
+setConsole(CONSOLE_ON_SERIAL);          /* fallback first */
+if (setjmp(jb) == 0) {
+        nofault = jb;
+        gr_init();                      /* touches the graphics hardware */
+        havegrconsole = 1;
+        if (consduart == 0)
+                setConsole(CONSOLE_ON_WIN);
+}
+```
+
+Nothing is patched to prefer serial - `_consduart` is 0 and every GL symbol is present
+(`_gr_init` `0x20048912`, `_gefind` `0x2004862c`, `_havegrconsole`). It falls back purely because
+`gr_init` bus errors and the longjmp fires.
+
+### What the graphics hardware is
+
+Four boards, "Enhanced IRIS Graphics" / GL2: **GF2, UC4, DC4, BP3**. All four now exist in
+`src/component/gpu/juniper/`. GL1 (GF1/UC3/DC3/BP2) is the previous generation and is *not* the same
+- see the warning in `gf2.hpp`.
+
+GF2 itself, per the owner:
+
+* 14 custom geometry engine chips, each four 32-bit ALUs with a microcode store and a config
+  register selecting its function. Pipelined: the first converts IEEE 754 to 20.8 fixed point, four
+  make a 4x4 matrix multiplier, six do clipping and z-buffering, two scale two coordinates each, and
+  the last converts back to IEEE 754. `gefind()` probes twelve of them.
+* The pipeline output feeds **four AMD Am2903 bitslice processors** in parallel for a 16-bit
+  datapath - that is the FBC, doing flat and Gouraud shading. Those four slices are exactly why the
+  microcode is `unsigned short ucode[][4]` and why `Micro_Write` walks `wd = 0..3`.
+* The FBC reaches VRAM through the **BPC** (bitplane controller), which has its own command set.
+  UC3/DC3 went through the BPC as well; **UC4 and DC4 do not**, so their side of VRAM can be modelled
+  as plain writes.
+* On the IP2 the pipe is not on the backplane: a private bus at segment 6 plus parts of Multibus I/O,
+  at a fixed address.
+
+## What was fixed three sessions ago: the 68020 exception path
 
 `panic: init died!` was three genuine bugs, all in how a bus error is delivered and returned from.
 They only ever mattered for the *first* fault that had to be recovered from, which is why boot got so
@@ -106,7 +153,7 @@ stack and the stack is demand-grown:
 * `movem` to `-(An)` writes `An` back before *each* store on a 68020, so a fault partway leaves it
   stranded. It now restores `An` if a `BusError` escapes the loop.
 
-## What was fixed last session: userland
+## What was fixed two sessions ago: userland
 
 Both bugs were the same shape — **an instruction that had already committed a side effect, then took
 a bus error, and got restarted from the top by the fault handler**. The 68020 does not have this
@@ -141,31 +188,83 @@ sides of the stack, the control-flow edge list and the **last 48 retired PCs** f
 (`TraceFatalUserFault` in `mc68020_core.cpp`). That raw PC window is what identified the `jsr` — the
 edge list alone does not show it.
 
+## What was fixed last session: GF2 bring-up
+
+`src/component/gpu/juniper/gf2/` is new. It is the board the CPU actually talks to, and its absence
+is why `gr_init` bus errored on its very first register access.
+
+**Written from the IRIX sources, not from MAME.** MAME's `sgi_gl1_device` is explicitly interim
+("TODO: everything"), emulates GL1 rather than GL2, and its `fbc_data_r` returns a constant `0x40`,
+which would spin IRIX's `fbc_reset()` forever - that loop only exits on `0xfff` or `0x7ff`. What MAME
+*was* good for is the address decode: its GF1 map matches `gl1/gfdev.h` register for register, which
+is what identified GF2's block as the same map at board decode `2<<12`. `gl2/gl2/include/gf2.h` then
+confirmed it outright.
+
+Implemented:
+
+* the four registers - FBCpixel `0x50002000`, FBCflags `0x50002400`, FBCdata `0x50002800`,
+  GEflags `0x50002C00`.
+* **the microcode store**, which is the part that matters. `Micro_Write` pushes 4096 states four
+  slices deep through a *window* based at FBCdata, then reads every word back and compares, so the
+  microcode has to be retained or the verify fails with `micro write error`. Slice 3 is eight bits
+  wide and its readback is masked to match. The state address is split: bits 0-8 come from the window
+  offset `(state & 0x1ff) << 1`, bits 9-11 and the slice come from GEflags. **State 0 of each
+  512-state block lands on FBCdata itself**, so the window must be inclusive of it and the mode, not
+  the address, decides which meaning applies. That off-by-one was the first bug.
+* FBCdata as a command port: written under a debug mode it poses a question, read back under
+  `READOUTRUN` it answers. `fbc_reset()` asks 8 (scratch RAM size, wants `0xfff`) and 7 (microcode
+  version, wants top byte `0x02`).
+* the FBC programmed interrupt, active low, raised when work is submitted and cleared by `FBCclrint`
+  (`FBCpixel = 1`). `gl_getplaneinfo` pushes commands then spins on it at `0x2004cd40`, so a constant
+  answer wedges the boot.
+* segment 6 mapped as the geometry pipe, currently **recording** the command stream rather than
+  executing it.
+
+Watch out: GL2's constants are not GL1's. `RUNMODE` is `0x31` here and `1` there, and GEflags grew to
+16 bits to carry the microcode addressing.
+
 ## Where the boot stops now
 
-Nothing blocks the boot. `+set consoleInputAfterSeconds 14 +set consoleInput 'echo hi\n'` gets you a
-shell that answers. Init's `initdefault` is `s`, so it goes to single user on its own and there is no
-run level prompt any more.
+**Serial console (default, `enableGF2` off): nothing blocks it.** Init's `initdefault` is `s`, so it
+reaches a single user root shell on its own in about 8 seconds. Root has no password.
 
-The remaining defect is **type-ahead**: a line typed while a command is still running loses or
-duplicates its first character, so `cat` runs as `at` and `echo` as `eecho`. Spacing input out (two
-`\p9` chunks, ~18s) avoids it entirely, which is why every scripted test here does that.
+**Graphics console (`+set enableGF2 1`): the FBC bring-up now completes and IRIX selects the
+graphics console, then init never starts.** Zero user-mode faults, kernel idling in `_sched`. The
+sequence that now works end to end is: probe finds the board, microcode loads and verifies,
+`FBC_Reset` and the version check pass, `gefind()` runs its full twelve-chip probe (visible in the
+log as `0x3a00`, `0xff09`, `0x2` twelve times, plus the head-FIFO walking-bit test). Then it stops,
+because nothing executes the geometry stream, so the textport never draws and init blocks on a
+console that never becomes ready.
 
-What is known about it, so it does not get re-derived:
+That is why it is behind a cvar and off by default: a half finished board is worse than no board,
+because with no board the reset bus errors, the longjmp fires and you get a working serial machine.
 
-* The DUART is **not** dropping it. There are zero FIFO overruns, and the tty *echo* of the mangled
-  line is always byte-correct — so the kernel received every character and the loss is between the
-  tty buffer and the shell's `read()`.
-* It is not the two bugs above; both fixes are in and it survives them.
+### The next concrete step
+
+Decode the segment 6 command stream into BP3 writes. `gl2cmds.h` is the opcode table
+(`GEmove 0x10`, `GEdraw 0x11`, `GEpoint 0x12`, `GEcurve 0x13`, matrix and viewport ops), and the
+stream is already being logged rather than discarded, so a real trace of exactly what the textport
+asks for is one boot away. The textport draws in screen coordinates, so this does **not** require the
+geometry pipeline to be real first - that is the shortest path from "IRIX selects the graphics
+console" to pixels.
+
+### The type-ahead bug (serial console)
+
+A line typed while a command is still running loses or duplicates its first character, so `cat` runs
+as `at` and `echo` as `eecho`. Spacing input out (two `\p9` chunks, ~18s) avoids it entirely, which is
+why every scripted test here does that. Known:
+
+* The DUART is **not** dropping it. Zero FIFO overruns, and the tty *echo* of the mangled line is
+  always byte-correct, so the kernel received every character and the loss is between the tty buffer
+  and the shell's `read()`.
 * It is not `copyout`/`sustring`. Both lock the user pages and copy through a kernel scratch mapping
   (`iolock` + the map window at `0x3b00dfd0` + `_vmmap+0x2000`), so no user page fault can happen
-  mid-copy. argv and freshly `setenv`'d variables now survive exec byte-for-byte.
+  mid-copy. argv and freshly `setenv`'d variables survive exec byte-for-byte.
 
 `tset -s -Q` also prints `setenv TERM |wsiri ;` instead of `wsiris ;` and loses the opening quote of
-`setenv TERMCAP '`, which is why `/.login` and `/.profile` both report `setenv: Too few arguments`
-and `wsiri: Command not found`. It looks like the same one-character class of bug, but note the disk
-is **GL2-W3.6** (see `/Versions`) while the source tree is 3.7, so `bin/tset/tset.c` is one minor
-version ahead of the binary and its scan loop cannot be trusted to match instruction for instruction.
+`setenv TERMCAP '`, which is why `/.login` and `/.profile` both report `setenv: Too few arguments`.
+It looks like the same one-character class of bug, but the disk is **GL2-W3.6** (see `/Versions`)
+while the source tree is 3.7, so `bin/tset/tset.c` is one minor version ahead of the binary.
 
 **Do not assume a silent boot means a hang.** `SerialLine` only writes a log line on newline, so a
 prompt with no trailing newline (`# `, `login:`) never appears in `motion.log` at all.
@@ -200,6 +299,9 @@ cd build/output/RelWithDebInfo && DISPLAY=:1 ./motion +set skipLauncher 1 +set s
   assert in `CHSToLinear` fires on this disk image. It also turns on ASan and `-O0`.
 * Log is `build/output/RelWithDebInfo/motion.log`. A 25s run is ~170 lines and ends with init
   waiting for a run level (silently — see below).
+* **Testing while the owner has an instance open**: both write `motion.log` into the working
+  directory, so run yours from a scratch directory with `assets`, `roms`, `profile` and `motion`
+  symlinked into it rather than killing theirs.
 * **Delete `motion.log` and `dumps/` when you are done with them** — the owner asked to keep the disk
   clear. A full dump set is 21MB and is regenerated in one run.
 * It runs until killed; use `timeout 25`, or 90+ if you want to drive userland. Shutdown segfaults —
@@ -215,12 +317,14 @@ cd build/output/RelWithDebInfo && DISPLAY=:1 ./motion +set skipLauncher 1 +set s
 | `+set logCpuTrace 1` | PC ring, control-flow-edge dump on unmapped access, **full state dump on a user fault in the null guard page** (registers, stack either side of sp, edge list, and the last 48 retired PCs), one-shot kernel-entry map dump, periodic PC+register sample, and abnormal-exception logging. Off by default because it records a PC per instruction. |
 | `+set dumpOnConsoleMatch panic` | Writes **every** memory editor to `dumps/` the first time a guest console line contains the string. This is the headless version of the new Dump Memory menu item. |
 | `+set logIP2MMU 1` | MMU register tracing. |
-| `+set dumpAfterSeconds 35` | Same dump, on a stopwatch instead. Added this session, because the interesting moments are usually the ones the guest says nothing about — a boot that goes quiet has no console line to match on. |
+| `+set enableGF2 1` | Fit the GF2 board. **Off by default** - with it on IRIX takes the graphics console and init never starts, so the machine has no usable console at all. On for graphics work, off for everything else. |
+| `+set logGF2 1` | GF2 register and geometry pipe tracing, including the segment 6 command stream. |
+| `+set dumpAfterSeconds 35` | Same dump, on a stopwatch instead. Useful because the interesting moments are usually the ones the guest says nothing about — a boot that goes quiet has no console line to match on. |
 | `+set consoleInput 'echo hi\n\p9ls /\n'` + `+set consoleInputAfterSeconds 14` | Types at the guest console. `\n`, `\r`, `\t`, `\\` and `\xNN` work; `\pN` waits N seconds before sending the rest (N is a single digit, so chain `\p9\p9` for longer), which is what makes a conversation possible. |
 
 `dumpOnConsoleMatch` produces three files: system RAM (16MB), VRAM (4MB), and **the IP2 page table**
 (64KB). The page table is not in system RAM — it is SRAM on the board — so a RAM dump does not contain
-it; it got its own editor last session precisely so it can be dumped. Entries are host order in the
+it; it has its own editor precisely so it can be dumped. Entries are host order in the
 dump, not the big endian the guest sees.
 
 ## Driving the boot
@@ -432,18 +536,29 @@ probes are "does this access bus error", so an over-wide decode invents hardware
 
 ## Known gaps
 
-No GF2 (no 3D, and no graphics console — see the top), no Ethernet, no Interphase SMD or Storager,
-no FPA, no DSD write path, no tape or floppy. `AddrSpace::GetMapping` linear-scans an `unordered_map`
-on every access. `Memory::Start` still writes a fake reset vector into RAM at 0 that nothing needs any
-more. The RTC has 50 bytes of battery backed RAM that are not persisted to the profile.
+GF2 exists but only as far as the FBC bring-up (see above) - no geometry pipeline, no FBC command
+execution, no BPC, so no 3D and no graphics console yet.
 
-Two more that surfaced this session:
+No Ethernet, no Interphase SMD or Storager, no FPA, no DSD write path, no tape or floppy - which
+also means **there is no way to install a different IRIX**: a 3130 was installed from tape, and the
+3.7 tree is source, not media. What *is* worth doing instead is mounting `/usr`, which is a complete
+79,704 block filesystem on `md0c` that never gets mounted because `/etc/fstab` is empty (which is
+also why `/etc/rc` prints `setmnt: malformed input d0a`). `/etc/mount /dev/md0c /usr` at the `#`
+prompt brings in `/usr/bin`, `/usr/people`, the demos and the tutorials.
 
-* **An unmapped access does not bus error.** `AddrSpace` logs a warning and returns `0xFF`. Real
-  hardware faults, and device probes are exactly "does this access bus error", so anything unmapped
-  currently reads as hardware that is present. This is the general form of the DSD over-decode bug.
-  Changing it globally is risky — plenty of probes now depend on the permissive behaviour — but it is
-  worth knowing when a driver decides a board exists that does not.
+`AddrSpace::GetMapping` linear-scans an `unordered_map` on every access. `Memory::Start` still writes
+a fake reset vector into RAM at 0 that nothing needs any more. The RTC has 50 bytes of battery backed
+RAM that are not persisted to the profile.
+
+* **An unmapped access still does not bus error in `AddrSpace`** - it logs a warning and returns
+  `0xFF`. The Multibus *is* now strict (`Multibus::DecodeSlave` returning `None` signals a fault),
+  which is what makes device probes come out right, but the general case elsewhere is unchanged.
 * **`ADDRSPACE_MAX_UNMAPPED_LOGGED` is 32 and is exhausted during PROM memory sizing**, long before
   anything interesting happens, so "no unmapped accesses in the log" proves nothing. The per-fault
-  logging behind `+set logCpuTrace 1` is not capped; use that instead.
+  logging behind `+set logCpuTrace 1` is not capped; use that instead. `MULTIBUS_MAX_UNMAPPED_LOGGED`
+  is 200 and is the one that catches graphics probes.
+* **Getty will block on carrier if you ever reach multi-user.** `co_9600` in `/etc/gettydefs` is
+  `B9600 SANE TAB3` with no `CLOCAL`, so `du_open` waits for carrier, and `du_act` decides it from
+  DUART register `0x0D` where **a clear bit means carrier present** (`IPORT_DCDA 0x08` for channel A,
+  `IPORT_DCDB 0x04` for B). `ip2_duart.cpp` returns `0xFF` there, so every line reads "no carrier".
+  `init 2` will therefore give you no `login:` until that is fixed.
