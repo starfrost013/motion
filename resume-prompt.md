@@ -406,8 +406,25 @@ probes are "does this access bus error", so an over-wide decode invents hardware
 * **MAME is the best reference for the IP2** —
   `https://raw.githubusercontent.com/mamedev/mame/master/src/mame/sgi/ip2.cpp`. Complete register map,
   MMU, protection model, slave map, interrupt wiring. Prefer it over the schematic scans.
-* `~/IRIS3130.zip` — IP2/BP3/UC4/IM1 schematics (scans, no text layer) and firmware. **No GF2
-  schematic, and no U118 vector PROM dump.** IP2 sheet index: 8 MOUSE/PARITY,
+* **Where the GF2/graphics documentation actually is.** Ranked, all local:
+  1. `SGi-IRIS-3.7/3.7/gl2/gl2/include/gf2.h` + `gf2init.c` — the register map and the exact init
+     protocol (Micro_Write, FBC_Reset, Get_Micro_Version). This is the spec; everything GF2 in the
+     emulator came from it.
+  2. `3.7/gl2/gl2/include/gl2cmds.h` — "GE and FBC opcodes reflecting GE rev2 and GL2 microcode,
+     GL2 microcode interrupt codes, GF2 scratch ram addresses". The decoder for the segment 6
+     command stream.
+  3. `3.7/gl2/gl2/ucode/` — **the FBC microcode source**, ~1MB of C-like microassembly headed
+     `<< GF2/UC4 >>`: char.c, cursor.c, polygons, scanconvert, depthvec.c, runlen.c. This is what
+     each FBC command actually does, at the level the four Am2903 slices execute it.
+  4. `3.7/gl2/gl2/kgl/` — the GL2 kernel driver: fbc.c, ge.c, **textport.c**, gr.c, init.c.
+  5. `3.7/diag/gf/` — factory diagnostics, which document hardware better than drivers do.
+     `src/gl2bpctest.c`, `gl2fbtext.c`, `gl2draws.c`, `gl2fifotest.c`, `microwrite.c`, and
+     `doc/gfld.doc` — a 27KB 1984 user's guide to the GF2 FBC/GE loader-debugger.
+  6. `3.7/diag/bpc/` — BPC tests, and `sys/gl1/bpccodes.h` for the bitplane controller command set.
+* `~/IRIS3130.zip` — IP2/BP3/UC4/IM1 schematics (scans, no text layer) and firmware. **There is no
+  GF2 schematic** and no U118 vector PROM dump, but there *is* `GF2-firmware.zip`: two 512-byte
+  PROMs (364-01, 365-01), a **PAL20L10 JEDEC fuse map** (366-02.JED) that decodes to the board's
+  address/control logic, and a 2MB board photo you can read part numbers off. IP2 sheet index: 8 MOUSE/PARITY,
   14 MAP.ADDRESS.GENERATION, 15 PROCESSOR.MAP, 16 PROTECTION/LIMIT, 18 MULTIBUS.MAP.AND.CONTROL.
 * DSD 5217 manuals on bitsavers under `pdf/dsd/5215_5217/`.
 * `dsd5217-analysis.md` in the repo root. Note its §2.3 (paragraph masking) is superseded — the CIB
