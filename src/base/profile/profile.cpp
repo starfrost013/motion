@@ -16,6 +16,8 @@ namespace Motion
     Cvar* profileFolder; 
     Cvar* profileDisk0Path; 
     Cvar* profileDisk1Path; 
+    Cvar* diskWriteMode;
+    Cvar* diskCommitOnExit;
 
     void Profile::Init()
     {
@@ -50,10 +52,9 @@ namespace Motion
 
     }
 
-    FileStream* Profile::OpenDisk(int32_t id, FileFlags flags)
+    DiskImage* Profile::OpenDisk(int32_t id)
     {
-        FileStream* hdd;
-        const char* hddPath; // for debug
+        const char* hddPath;
 
         // I also don't like this code
         switch (id)
@@ -68,18 +69,54 @@ namespace Motion
                 Logger::Log(PROFILE_LOG_PREFIX, "Profile::OpenDisk - Only 2 HDDs are supported!");
                 return nullptr;
         }
-        
-        Logger::Log(PROFILE_LOG_PREFIX, std::format("Opening HDD {} at {}...", id, hddPath).c_str());
 
-        hdd = Profile::Open(hddPath, flags);
+        DiskWriteMode mode = DiskImage::ModeFromString(diskWriteMode->GetString());
 
-        if (!hdd)
+        // Disks live in the profile folder like everything else, and DiskImage takes the path as
+        // given, so resolve it here rather than inside it.
+        char resolved[STRING_MAX_PATH] = {0};
+        GetProfileFolderPath(hddPath, resolved);
+
+        if (!std::filesystem::exists(profileFolder->GetString()))
+            std::filesystem::create_directory(profileFolder->GetString());
+
+        Logger::Log(PROFILE_LOG_PREFIX, std::format("Opening HDD {} at {} ({})",
+            id, hddPath, DiskImage::ModeName(mode)).c_str());
+
+        DiskImage* image = DiskImage::Open(resolved, mode);
+
+        if (!image)
         {
             Logger::Log(PROFILE_LOG_PREFIX, std::format("Failed to open HDD {} at {}!", id, hddPath).c_str(), LogChannels::Error);
             return nullptr; 
         }
 
-        return hdd;
+        if (mode == DiskWriteMode::Overlay)
+            Logger::Log(PROFILE_LOG_PREFIX, std::format("HDD {} is copy-on-write: the image on disk will not be "
+                "modified{}", id, diskCommitOnExit->GetValue() ? " unless the guest writes to it, which will be "
+                "committed on exit" : ", whatever happens to the emulator").c_str());
+
+        return image;
+    }
+
+    void Profile::CloseDisk(DiskImage* image)
+    {
+        if (!image)
+            return;
+
+        /*
+            The one way an overlay survives the process. It is off by default because throwing the
+            writes away is the entire point of the mode - this is for the boot where you meant it,
+            like an /etc/fsck repair you want to keep.
+        */
+        if (image->GetMode() == DiskWriteMode::Overlay
+        && diskCommitOnExit->GetValue()
+        && image->GetDirtySectorCount())
+        {
+            image->Commit();
+        }
+
+        delete image;
     }
 
     void Profile::Close(FileStream* fs)

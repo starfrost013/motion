@@ -253,7 +253,7 @@ namespace Motion
         /// @brief Per drive state. A drive is only usable once a C_INIT has given it a geometry.
         struct Drive
         {
-            FileStream* image = nullptr;
+            DiskImage* image = nullptr;
             size_t imageSize = 0;
             bool initialised = false;
             uint16_t cylinders = 0;

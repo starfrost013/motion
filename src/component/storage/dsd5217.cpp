@@ -457,10 +457,7 @@ namespace Motion
             and the filesystem both describe a fixed number of blocks, so anything landing beyond
             them is lost anyway and only makes the file no longer match its own label.
         */
-        hdd->stream.clear();
-        hdd->stream.seekg(0, std::ios_base::end);
-
-        size_t imageSize = (size_t)hdd->stream.tellg();
+        size_t imageSize = hdd->GetSize();
 
         if (diskLinear >= imageSize)
         {
@@ -512,20 +509,14 @@ namespace Motion
             for (; i < bytesToTransfer; i++)
                 sectorBuffer[i] = MBRead8(source + i);
 
-            // Reposition between reading and writing the same stream, and flush so that a reader
-            // coming straight back for these blocks sees them.
-            hdd->stream.clear();
-            hdd->stream.seekp(diskLinear + transferred, std::ios_base::beg);
-            hdd->stream.write((const char*)sectorBuffer, bytesToTransfer);
-            hdd->stream.flush();
-
-            if (hdd->stream.fail())
+            // Where this lands depends on the mode - straight to the file, or into the copy-on-write
+            // overlay. See disk_image.hpp.
+            if (!hdd->Write(diskLinear + transferred, sectorBuffer, bytesToTransfer))
             {
                 Logger::Log(DSD5217_LOG_PREFIX, std::format("Write of {} bytes at 0x{:x} failed",
                     bytesToTransfer, diskLinear + transferred).c_str(), LogChannels::Error);
 
                 inist.sb[DSD5217_SB_HARD_ERROR0] |= DSD5217_HARDERR0_END_OF_MEDIA;
-                hdd->stream.clear();
                 return false;
             }
 
@@ -590,24 +581,27 @@ namespace Motion
             uint32_t remaining = iopb.rbc - transferred;
             uint32_t bytesToTransfer = (remaining < bytesPerSector) ? remaining : (uint32_t)bytesPerSector;
 
-            // A short read latches eofbit/failbit and every later seek and read on the stream then
-            // silently does nothing, so clear it before touching the stream again.
-            hdd->stream.clear();
-            hdd->stream.seekg(diskLinear + transferred, std::ios_base::beg);
-            hdd->stream.read((char*)sectorBuffer, bytesPerSector);
+            // Clamp against what is left of the image rather than asking for a whole sector and
+            // seeing how much comes back - DiskImage refuses a read that runs off the end outright.
+            size_t remainingOnDisk = (diskLinear + transferred < hdd->GetSize())
+                ? (hdd->GetSize() - (diskLinear + transferred)) : 0;
 
-            std::streamsize bytesRead = hdd->stream.gcount();
-
-            if (bytesRead <= 0)
+            if (!remainingOnDisk)
             {
                 endOfMedia = true;
                 break;
             }
 
-            if ((uint32_t)bytesRead < bytesToTransfer)
+            if (remainingOnDisk < bytesToTransfer)
             {
-                bytesToTransfer = (uint32_t)bytesRead;
+                bytesToTransfer = (uint32_t)remainingOnDisk;
                 endOfMedia = true;
+            }
+
+            if (!hdd->Read(diskLinear + transferred, sectorBuffer, bytesToTransfer))
+            {
+                endOfMedia = true;
+                break;
             }
 
             size_t destination = iopb.dba + transferred;
@@ -701,6 +695,6 @@ namespace Motion
         delete dsdExtension;
 
         if (hdd)
-            Profile::Close(hdd);
+            Profile::CloseDisk(hdd);
     }
 };

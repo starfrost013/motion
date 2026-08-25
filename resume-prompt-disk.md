@@ -44,12 +44,17 @@ Run it:
 ```bash
 cd scratch/runsii
 ./motion +set skipLauncher 1 +set startPaused 0 \
-         +set profileDisk1Path 3130-si0.img +set bootDevice sd +set enableDSD 0
+         +set profileDisk1Path 3130-si0.img +set bootDevice sd +set enableDSD 0 \
+         +set diskWriteMode overlay
 ```
+
+`diskWriteMode overlay` is copy on write: the image is opened read-only and guest writes are held in
+memory, so it does not matter how you stop the emulator. Drop it when you want the writes kept, or
+keep it and add `+set diskCommitOnExit 1` for the one boot where you do.
 
 **The DSD 5217 is unchanged and still the default.** With no arguments the machine is the 3115 it
 always was — `root on md0a`, the Storager probes alive with no drive attached and says
-`si0 not installed`. Three cvars change that, all new:
+`si0 not installed`. These cvars change that, all new:
 
 | cvar | default | what it does |
 | --- | --- | --- |
@@ -58,6 +63,8 @@ always was — `root on md0a`, the Storager probes alive with no drive attached 
 | `enableDSD` | 1 | Fit the DSD 5217. `0` gives a machine with no `md0` at all. |
 | `bootDevice` | `md` | Which device the **PROM** loads the kernel from. `sd` is the Storager. |
 | `logStorager` | 0 | One line per command the Storager executes. |
+| `diskWriteMode` | `direct` | `overlay` is copy on write - see below. `readonly` refuses writes. |
+| `diskCommitOnExit` | 0 | With `overlay`, write what the guest did back into the image on shutdown. |
 
 ## What the Storager is, and where the emulation lives
 
@@ -212,12 +219,14 @@ Nothing blocks a working disk. In rough order of how much each one buys:
 
 ## Two things that are not bugs
 
-* **`filesystem corruption on si0a` after a boot you killed.** Exactly the same rule as md0: EFS
-  flushes its free bitmap from `efs_update`, so a machine stopped after allocating a block leaves an
-  inode pointing at a block the on-disk bitmap still calls free. `sync` first, or repair with
-  `/etc/fsck -y /dev/rsi0a`. It is what a real machine does when you pull the plug, and it is the
-  reason every scripted test here ends in `sync`. **`consoleInput` drives the serial line**, so with
-  `+set enableGF2 1` the shell is on the graphics screen and a scripted `sync` goes nowhere.
+* **`filesystem corruption on si0a` after a boot you killed.** EFS flushes its free bitmap from
+  `efs_update`, so a machine stopped after allocating a block leaves an inode pointing at a block the
+  on-disk bitmap still calls free. It is what a real machine does when you pull the plug.
+  **`+set diskWriteMode overlay` is the answer** - the image is opened read-only and guest writes are
+  held in memory, so no amount of killing the emulator can damage it, and a boot purely to check
+  something costs the disk nothing. Without it, `sync` first or repair with `/etc/fsck -y /dev/rsi0a`,
+  and note that **`consoleInput` drives the serial line**, so with `+set enableGF2 1` the shell is on
+  the graphics screen and a scripted `sync` goes nowhere.
 * **`md1` in the probe list.** The DSD answers for unit 1 out of the same image, so md0 and md1 are
   the same disk twice. Pre-existing, unrelated to any of this, and harmless because nothing mounts
   md1 — but it is why the DSD prints two drives and the Storager prints one.
@@ -235,6 +244,7 @@ MOTION_IMG=scratch/hd/3130-si0.img python3 scratch/efs.py -c /etc/model
 contents still fit the blocks already allocated (`--show <path>` dumps one). Root is partition block
 119, `/usr` is 35700. `scratch/relabel.py <image>` prints the label.
 
-**Two emulators on one image will corrupt it.** `Profile::OpenDisk` opens `in | out` with no lock and
-no read-only mode. Check `pgrep -af RelWithDebInfo/motion` before starting one. It also breaks
-`xdotool`, which picks the *last* matching window.
+**Two emulators on one image will corrupt it** - in `direct` mode. `Profile::OpenDisk` opens it
+`in | out` with no lock, so nothing stops two of them interleaving writes. In `overlay` or `readonly`
+mode neither holds the file for writing and it stops mattering. Two instances still break `xdotool`,
+which picks the *last* matching window.

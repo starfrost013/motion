@@ -662,6 +662,8 @@ cd build/output/RelWithDebInfo && DISPLAY=:1 ./motion +set skipLauncher 1 +set s
 | `+set enableDSD 0` | Leave the DSD 5217 out. Needed for a *pure* 3130 - with both fitted, root moves to si0a but swap stays on md0b, because `setroot()` only takes a strictly larger swap partition than the one it already has. |
 | `+set bootDevice sd` | Which device the **PROM** loads the kernel from, by name: `md` (default, DSD disk), `sd` (Storager disk), `mf`/`sf` floppies, `mt`/`st` tapes, `ip`, `xns`, `prom`, `eprom`. Previously hardcoded to md. |
 | `+set logStorager 1` | One line per command the Storager executes, with its CHS, its Multibus buffer and its length. |
+| `+set diskWriteMode overlay` | **Copy on write.** The image is opened read-only and guest writes are kept in memory, so it does not matter how the emulator stops and two of them on one image stop being dangerous. `direct` (the default) writes straight through as it always did; `readonly` refuses writes and the guest gets `hard error: bus timeout error`. |
+| `+set diskCommitOnExit 1` | With `overlay`, fold what the guest wrote back into the image on shutdown. The one way an overlay survives the process - for the boot where you meant it, like an `/etc/fsck` repair you want to keep. |
 | `+set numBitplanes 8` | How many bitplanes BP3 fits. The GF2 pixel readback answers `gl_getplaneinfo` from this, so IRIX believes it. Default 32, which IRIX caps to twelve usable. |
 | `+set dumpAfterSeconds 35` | Same dump, on a stopwatch instead. Useful because the interesting moments are usually the ones the guest says nothing about — a boot that goes quiet has no console line to match on. |
 | `+set consoleInput 'echo hi\n\p9ls /\n'` + `+set consoleInputAfterSeconds 14` | Types at the guest console. `\n`, `\r`, `\t`, `\\` and `\xNN` work; `\pN` waits N seconds before sending the rest (N is a single digit, so chain `\p9\p9` for longer), which is what makes a conversation possible. |
@@ -905,8 +907,11 @@ here goes through `xdotool`.
 
 No Ethernet, no Interphase SMD, no FPA, no tape or floppy. **Both disk controllers work both ways** -
 the DSD 5217 (`md0`) and the Interphase Storager (`si0`) - and `/etc/fsck` repairs its own filesystem
-on either, which means the machine has to be allowed to `sync` before it is stopped, and that two
-emulators on one image will really corrupt it. **`resume-prompt-disk.md` is the handoff for
+on either - which used to mean the machine had to be allowed to `sync` before it was stopped, and that
+two emulators on one image would really corrupt it. **`+set diskWriteMode overlay` retires both of
+those**: the image is opened read-only and guest writes are held in memory, so the file on disk is
+untouched however the emulator dies. Use it for anything except the boot where you actually want to
+keep what the guest wrote. **`resume-prompt-disk.md` is the handoff for
 storage**; what is left of it is the tape and floppy halves of the Storager, `si1`, and formatting.
 Installation media does exist after all - the GL2-W3.6 tapes in `~/repos/sgiresearch/iris3000` - but
 nothing needs installing, because `/usr` on `md0c` is the same release and already complete. See the
@@ -920,10 +925,11 @@ and only `3030|3120B|3130` to `si0a`/`si0f`. `scratch/runsii` runs it:
 ```bash
 cd scratch/runsii
 ./motion +set skipLauncher 1 +set startPaused 0 \
-         +set profileDisk1Path 3130-si0.img +set bootDevice sd +set enableDSD 0
+         +set profileDisk1Path 3130-si0.img +set bootDevice sd +set enableDSD 0 \
+         +set diskWriteMode overlay
 ```
 
-The default configuration is unchanged - no arguments still gives the 3115 booting off md0a, with the
+Drop `diskWriteMode` if you want the guest's writes to stick. The default configuration is unchanged - no arguments still gives the 3115 booting off md0a, with the
 Storager probing alive and reporting no drive.
 
 `AddrSpace::GetMapping` linear-scans an `unordered_map` on every access. `Memory::Start` still writes

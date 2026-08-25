@@ -14,6 +14,7 @@
 #pragma once
 #include <Motion.hpp>
 #include <base/filesystem/filesystem.hpp>
+#include <base/filesystem/disk_image.hpp>
 #include <platform/formats/ini.hpp>
 
 namespace Motion
@@ -23,6 +24,8 @@ namespace Motion
     extern Cvar* profileFolder; 
     extern Cvar* profileDisk0Path;
     extern Cvar* profileDisk1Path; // for future expansion
+    extern Cvar* diskWriteMode;
+    extern Cvar* diskCommitOnExit;
 
     extern Cvar* ramInstalled;
     extern Cvar* numBitplanes;
@@ -57,8 +60,14 @@ namespace Motion
         /// @param skipProfileAddition if this is true, a temporary bufer of the right size will be created and passed into filesystem::open
         static FileStream* Open(const char* path, FileFlags mode = FileFlags::Text, bool skipProfileAddition = false);
 
-        /// utility method to allow opening the user specified hard drive.
-        static FileStream* OpenDisk(int32_t id, FileFlags mode = FileFlags::Binary); // use binary as default
+        /// @brief Open one of the user specified hard drives, honouring +set diskWriteMode. The
+        ///        caller gets a DiskImage rather than a raw stream so that the copy-on-write overlay
+        ///        is the same for every controller - see disk_image.hpp.
+        static DiskImage* OpenDisk(int32_t id);
+
+        /// @brief Close a disk, committing its overlay first if +set diskCommitOnExit says so.
+        ///        YOU MUST SET TO NULLPTR, your image is DEAD.
+        static void CloseDisk(DiskImage* image);
         
         /// @brief this method does the same thing as Filesystem::Close. YOU MUST SET TO NULLPTR, your stream is DEAD
         static void Close(FileStream* fs);

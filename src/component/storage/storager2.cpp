@@ -57,9 +57,7 @@ namespace Motion
 
         if (drives[0].image)
         {
-            drives[0].image->stream.seekg(0, std::ios_base::end);
-            drives[0].imageSize = (size_t)drives[0].image->stream.tellg();
-            drives[0].image->stream.clear();
+            drives[0].imageSize = drives[0].image->GetSize();
 
             Logger::Log(STORAGER2_LOG_PREFIX, std::format("si0: {} byte image ({} blocks of {})",
                 drives[0].imageSize, drives[0].imageSize / STORAGER2_BLOCK_SIZE, STORAGER2_BLOCK_SIZE).c_str());
@@ -81,7 +79,7 @@ namespace Motion
             if (!drive.image)
                 continue;
 
-            Profile::Close(drive.image);
+            Profile::CloseDisk(drive.image);
             drive.image = nullptr;
         }
     }
@@ -724,35 +722,24 @@ namespace Motion
                 for (; i < chunk; i++)
                     sector[i] = MBRead8(buffer + i);
 
-                // A short read or a failed seek latches failbit and every later access on the stream
-                // silently does nothing, so clear it before touching the stream again.
-                drive.image->stream.clear();
-                drive.image->stream.seekp(linear + transferred, std::ios_base::beg);
-                drive.image->stream.write((const char*)sector, chunk);
-                drive.image->stream.flush();
-
-                if (drive.image->stream.fail())
+                // Where this lands depends on the mode - straight to the file, or into the
+                // copy-on-write overlay. See disk_image.hpp.
+                if (!drive.image->Write(linear + transferred, sector, chunk))
                 {
                     Logger::Log(STORAGER2_LOG_PREFIX, std::format("Write of {} bytes at 0x{:x} failed",
                         chunk, linear + transferred).c_str(), LogChannels::Error);
 
-                    drive.image->stream.clear();
                     errorOut = STORAGER2_ERR_BUSTIMEOUT;
                     return false;
                 }
             }
             else
             {
-                drive.image->stream.clear();
-                drive.image->stream.seekg(linear + transferred, std::ios_base::beg);
-                drive.image->stream.read((char*)sector, chunk);
-
-                if ((size_t)drive.image->stream.gcount() != chunk)
+                if (!drive.image->Read(linear + transferred, sector, chunk))
                 {
                     Logger::Log(STORAGER2_LOG_PREFIX, std::format("Read of {} bytes at 0x{:x} came up short",
                         chunk, linear + transferred).c_str(), LogChannels::Error);
 
-                    drive.image->stream.clear();
                     errorOut = STORAGER2_ERR_SECTORNOTFOUND;
                     return false;
                 }
