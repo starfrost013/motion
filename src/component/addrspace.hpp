@@ -18,8 +18,7 @@
 // Everything at or above this is devices rather than RAM, so a hole in it is a bus timeout.
 #define ADDRSPACE_DEVICE_SPACE_START 0x30000000
 
-// The PROM sizes memory by writing patterns into RAM that is not fitted, and the kernel probes for
-// boards that are not there. Neither is news after the first few, so do not let them bury the log.
+// PROM memory sizing and device probes both touch nothing, and neither is news after the first few.
 #define ADDRSPACE_MAX_UNMAPPED_LOGGED 32
 
 namespace Motion
@@ -76,8 +75,7 @@ namespace Motion
                 the access decides what to do with it. The CPU turns it into a bus error; the debugger and
                 anything else reading memory behind the machine's back can just ignore it.
             */
-            /// @brief Faults are ignored until the CPU is out of reset, the same way the MMU declines to
-            /// translate during reset - the reset vector fetch happens before every device has mapped itself.
+            /// @brief Faults are ignored until the CPU is out of reset - the reset vector fetch precedes every device mapping itself.
             static void SetFaultsEnabled(bool enabled) { faultsEnabled = enabled; };
 
             /*
@@ -105,8 +103,7 @@ namespace Motion
             static void PushPeek() { peekDepth++; };
             static void PopPeek() { if (peekDepth) peekDepth--; };
 
-            /// @brief True while the current read is the debugger's rather than the machine's. A
-            /// device register with a read side effect has to ask, or the debugger drives the device.
+            /// @brief True while the read is the debugger's, so a register with a read side effect can decline to fire it.
             static bool IsPeeking() { return peekDepth > 0; };
 
             static void SignalFault(size_t addr, bool isWrite);

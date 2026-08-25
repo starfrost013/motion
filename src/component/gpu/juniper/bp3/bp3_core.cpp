@@ -129,9 +129,7 @@ namespace Motion
         if (!InRange(addr, sizeof(uint16_t)))
             return;
 
-        // A word index is the byte address halved, not quartered - >> 2 put every 16 bit write at
-        // half the offset it was meant for, which is the same address two different pixels share.
-        // It is a memcpy now so that a misaligned address lands where it was asked to; see Read16.
+        // memcpy so a misaligned address lands where it was asked to; and a word index is the byte address halved, not quartered.
         uint16_t masked = (uint16_t)(value & writeMask);
         memcpy(vram + addr, &masked, sizeof(masked));
     }

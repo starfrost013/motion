@@ -75,13 +75,10 @@ namespace Motion
         /// @param skipProfileAddition if this is true, a temporary bufer of the right size will be created and passed into filesystem::open
         static FileStream* Open(const char* path, FileFlags mode = FileFlags::Text, bool skipProfileAddition = false);
 
-        /// @brief Open one of the user specified hard drives, honouring +set diskWriteMode. The
-        ///        caller gets a DiskImage rather than a raw stream so that the copy-on-write overlay
-        ///        is the same for every controller - see disk_image.hpp.
+        /// @brief Open a drive as a DiskImage, honouring +set diskWriteMode so every controller gets the same overlay.
         static DiskImage* OpenDisk(int32_t id);
 
-        /// @brief Close a disk, committing its overlay first if +set diskCommitOnExit says so.
-        ///        YOU MUST SET TO NULLPTR, your image is DEAD.
+        /// @brief Close a disk, committing its overlay if +set diskCommitOnExit says so. YOU MUST SET TO NULLPTR.
         static void CloseDisk(DiskImage* image);
 
         /// @brief Which disk controller +set diskController asks for. Warns once if it is nonsense.

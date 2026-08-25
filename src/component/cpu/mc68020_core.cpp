@@ -114,10 +114,7 @@ namespace Motion
                 i, cpu.reg.d[i], i, cpu.reg.a[i]).c_str(), LogChannels::Warning);
         }
 
-        // The stack is where a smashed pointer usually comes from, so show what is sitting on it,
-        // both sides: the arguments a callee was handed live above sp, the frame it just built below.
-        // Behind a peek, because this is not an access the machine is making and it must not raise a
-        // fault of its own on top of the one being reported.
+        // Both sides of sp - arguments above, the new frame below - behind a peek, so reporting a fault cannot raise one.
         {
             AddrSpacePeek peek;
             uint32_t sp = cpu.reg.a[7];
@@ -161,8 +158,7 @@ namespace Motion
             uint32_t prev = tracePcs[(traceCount - total + i - 1) % PC_TRACE_SIZE];
             uint32_t cur = tracePcs[(traceCount - total + i) % PC_TRACE_SIZE];
 
-            // a straight-line 68020 instruction is at most 10ish bytes, so anything further than
-            // that, or backwards, is a taken branch
+            // a straight-line 68020 instruction is at most 10ish bytes, so further than that, or backwards, is a taken branch
             if (cur >= prev && cur - prev <= 12)
                 continue;
 
@@ -202,8 +198,7 @@ namespace Motion
 
         uint32_t pc = tracedCpu->moiraCpu.getPC();
 
-        // The PROM's memory sizing loop walks unfitted RAM on purpose and the FPA is not emulated at
-        // all, so neither is a symptom of anything. Everything else is worth a look.
+        // PROM memory sizing and the absent FPA are both expected; everything else is worth a look.
         if (addr >= MMU_SEGMENT_FPA)
             return;
 
@@ -286,8 +281,7 @@ namespace Motion
 
             tracePcs[traceCount++ % PC_TRACE_SIZE] = pc;
 
-            // The kernel can be alive and making progress without logging anything at all, and a
-            // periodic sample is the cheapest way to tell that apart from a hang.
+            // A periodic sample is the cheapest way to tell a quiet but progressing kernel from a hung one.
             if (traceKernelSeen && !(traceCount % PC_TRACE_SAMPLE_EVERY))
                 Logger::Log(LOG_PREFIX_68020, std::format("sample: {}M instructions, pc 0x{:x}, sp 0x{:x}, a0 0x{:x} a1 0x{:x} a2 0x{:x} a3 0x{:x} a4 0x{:x} a5 0x{:x} d0 0x{:x}",
                     traceCount / 1000000, pc, moiraCpu.reg.a[7], moiraCpu.reg.a[0], moiraCpu.reg.a[1],

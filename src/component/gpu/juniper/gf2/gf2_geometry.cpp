@@ -246,8 +246,7 @@ namespace Motion
 
         bool changed = (cursorGlyph != words[1] || cursorColour != words[5] || cursorWriteMask != words[7]);
 
-        // Changing the cursor while it is up would otherwise leave the old glyph on the screen with
-        // no record of what was underneath it.
+        // Changing the cursor while it is up would strand the old glyph with no record of what was under it.
         bool wasDrawn = cursorDrawn;
         int32_t wasX = cursorX;
         int32_t wasY = cursorY;
@@ -508,8 +507,7 @@ namespace Motion
                 float y0 = polygonY[i];
                 float y1 = polygonY[next];
 
-                // A crossing counts for the edge whose lower end it is on, so shared vertices
-                // are not counted twice and the parity stays right.
+                // A crossing counts for the edge whose lower end it is on, so a shared vertex is not counted twice.
                 if ((y0 <= sampleY) == (y1 <= sampleY))
                     continue;
 

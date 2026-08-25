@@ -50,8 +50,7 @@ namespace Motion
         switchExtension = new CoherentExtensionIP2Switches(this);
         Coherent::RegisterExtension(switchExtension);
 
-        // setup reasonable defaults - this used to be left uninitialised, so which device the
-        // PROM tried to boot from was down to whatever happened to be in the heap that day.
+        // Reasonable defaults; this used to be uninitialised, so the boot device was whatever was in the heap that day.
         switchState = (SWITCH_AUTOBOOT | SWITCH_BOOT_DEVICE_MD);
 
         /*

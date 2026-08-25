@@ -33,22 +33,12 @@
 
 namespace Motion
 {
-    // The controller answers on a single jumper-selected programmed I/O address. Only writes are decoded.
-    /*
-        "Only I/O write operations are recognized" - and only at one address. The board decodes a
-        single byte wide programmed I/O port, which the console reports as "dsd0 at mbio 0x7f00".
-
-        This used to claim the whole 0x7F00-0x7FFF page. Nothing else answers in there, so every read
-        of it came back as 0xFF from this board, and the kernel probing for an EXOS Ethernet at
-        0x7ffc read that, decided a board was present, attached it and then sat in _exconfig waiting
-        forever for a controller that is not fitted.
-    */
+    // One jumper-selected byte-wide port, writes only. Claiming the whole 0x7F00 page made the EXOS probe at 0x7ffc find a phantom board.
     #define DSD5217_MBIO_START                  0x50007F00
     #define DSD5217_MBIO_END                    0x50007F01
     #define DSD5217_MBIO_COMMAND                0x7F01 // all addresses are 1mb region
 
-    // Programmed I/O commands. Only the two least significant bits of the written byte are decoded.
-    // (5215 User Guide, 4.6.1 Input/Output Commands)
+    // Programmed I/O commands, bottom two bits only (5215 User Guide, 4.6.1)
     #define DSD5217_IO_COMMAND_MASK             0x03
     #define DSD5217_IO_CLEAR                    0x00    // clear interrupt / remove reset
     #define DSD5217_IO_START                    0x01    // start operation
@@ -57,8 +47,7 @@ namespace Motion
     // 20 bit seg:off addressing or 24 bit linear. we only implement 24 bit linear
     #define DSD5217_24BIT_ADDRESSING            7
 
-    // The wake-up block lives at a jumper-selected Multibus memory address. SGI hardcode this one.
-    // It is READ by the controller out of Multibus RAM - we do not decode it.
+    // Jumper-selected, and SGI hardcode this one. The controller READS it out of Multibus RAM - we do not decode it.
     #define DSD5217_WUB_ADDRESS                 0x7F000
     #define DSD5217_WUB_OFF_EXTENSION           0x00    // multibus byte offsets within the WUB
     #define DSD5217_WUB_OFF_CCB_PTR             0x02
@@ -331,8 +320,7 @@ namespace Motion
         /// @brief The drive the IOPB in hand is addressed to, or nullptr if that unit is not fitted.
         Drive* CurrentDrive();
 
-        /// @brief Set from CurrentDrive() when a command is fetched, so the helpers below do not all
-        ///        have to be handed it.
+        /// @brief Set from CurrentDrive() when a command is fetched, so the helpers need not each be handed it.
         Drive* currentDrive = nullptr;
 
         WUB wub = {0};
@@ -375,8 +363,7 @@ namespace Motion
         bool ReadInitBlock();
         bool WriteStatusBlock();
 
-        // The controller comes up held in reset. The first start command after the reset is removed only
-        // chains through the tables - it does not execute an IOPB. (5215 User Guide, 4.5 step C)
+        // Held in reset at power on; the first start after that only chains the tables (5215 User Guide, 4.5 step C)
         bool inReset = true;
         bool tablesFetched = false;
         bool irqAsserted = false;

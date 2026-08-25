@@ -46,9 +46,7 @@ namespace Motion
         map[i] = [0x33000010] + i before it boots anything, then hands Multibus addresses to the disk
         controller and reads the results back through segment 4.
     */
-    // Upstream spells the same region absolutely, as MULTIBUS_PAGING_START/END (0x40100000-0x401FFFFF)
-    // with MULTIBUS_NUM_PAGE_ENTRIES and MULTIBUS_PAGE_SIZE; these are the same map, expressed
-    // relative to the start of the backplane window instead. Keep both in step when rebasing.
+    // The same map upstream spells absolutely as MULTIBUS_PAGING_START/END; keep both in step when rebasing.
     #define MULTIBUS_SLAVE_WINDOW_END       0x0FFFFF
     #define MULTIBUS_SLAVE_MAP_START        0x100000
     #define MULTIBUS_SLAVE_MAP_END          0x1FFFFF
@@ -62,8 +60,7 @@ namespace Motion
 
     #define MULTIBUS_LOG_PREFIX             "Multibus"
 
-    // The kernel probes for every board SGI ever shipped, and none of the ones that are missing are
-    // news after the first time, so do not let them bury the rest of the log.
+    // The kernel probes for every board SGI ever shipped, and a missing one is not news after the first time.
     #define MULTIBUS_MAX_UNMAPPED_LOGGED    200
 
     #define MULTIBUS_NUM_IRQ                0x8
@@ -145,9 +142,7 @@ namespace Motion
         void Write16(size_t addr, uint16_t value) override;
         void Write32(size_t addr, uint32_t value) override;
 
-        // For bus MASTERS other than the CPU - the disk controller fetches its own control blocks.
-        // These take a raw backplane address, which the decode below resolves the same way it does
-        // for a CPU access through segment 4.
+        // For bus MASTERS other than the CPU. Raw backplane addresses, resolved exactly as a CPU access through segment 4.
         uint8_t ReadMB8(size_t addr) { return Read8(MULTIBUS_MEMORY_START + (addr & MULTIBUS_ADDRESS_MASK)); }; 
         uint16_t ReadMB16(size_t addr) { return Read16(MULTIBUS_MEMORY_START + (addr & MULTIBUS_ADDRESS_MASK)); }; 
         uint32_t ReadMB32(size_t addr) { return Read32(MULTIBUS_MEMORY_START + (addr & MULTIBUS_ADDRESS_MASK)); }; 
@@ -167,9 +162,7 @@ namespace Motion
             Map,        // the slave map SRAM itself
         };
 
-        /// @brief Resolve a Multibus address the backplane did not claim.
-        /// @param addr full address as the address space sees it (segment 4)
-        /// @param target set to a system RAM address for Ram, or a map entry index for Map
+        /// @brief Resolve a segment 4 address no card claimed; `target` comes back a RAM address or a map entry index.
         SlaveTarget DecodeSlave(size_t addr, size_t* target);
 
         /// @brief Report an access nothing answered for, rate limited.

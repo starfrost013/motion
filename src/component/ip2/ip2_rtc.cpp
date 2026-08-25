@@ -18,8 +18,7 @@ namespace Motion
         if (addr < IP2_CLOCK_DATA)
             return (uint8_t)control;
 
-        // Data only comes back while the read strobes are up. Otherwise the port reads back the
-        // address that was latched into it, which is how the PROM checks the latch works.
+        // Data only while the read strobes are up; otherwise the port reads back the latched address, which the PROM checks.
         if (control == (RTC_CTRL_READ_ENABLE | RTC_CTRL_DATA_STROBE))
             return ReadRegister(address);
 

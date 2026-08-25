@@ -70,8 +70,7 @@ namespace Motion
     class IP2Interrupt : public Component
     {
     public:
-        // The MMU forwards the status register here and devices assert through here, so both need to
-        // be able to find it already started.
+        // The MMU forwards the status register here and devices assert through here, so both need it started.
         bool IsEarlyStart() override { return true; };
 
         const char* GetName() override { return "IRIS 3130 IP2 Interrupt Logic"; };

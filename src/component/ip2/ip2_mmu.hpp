@@ -30,12 +30,10 @@ namespace Motion
     #define MMU_START                       0x36000000
     #define MMU_END                         0x3F000000
 
-    // 17x AM2167-35PC (16384x1) gives 16384 entries of 17 bits, which is exactly the width of
-    // MMU_MASK_ALWAYS_SET below: 13 bits of frame number plus protection, referenced and modified.
+    // 17x AM2167-35PC (16384x1): 16384 entries of 17 bits - 13 of frame number plus protection, referenced and modified.
     #define PAGETABLE_MAX_PAGES             (1 << 14)
 
-    // The page number is the 14 bits above the 4KB page offset. Relying on a uint16_t to truncate it
-    // keeps 16 bits, which is two bits too many.
+    // The 14 bits above the page offset; letting a uint16_t truncate keeps 16, which is two too many.
     #define PAGETABLE_PAGE_MASK             0x3FFF
 
     // Frame number in a page table entry. This is 13 bits, NOT 14 - see MMU_MASK_ALWAYS_SET.

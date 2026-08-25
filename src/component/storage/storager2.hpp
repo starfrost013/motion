@@ -4,43 +4,7 @@
 
     Copyright (c)2026 starfrost
 
-    storager2.hpp: The Interphase Storager 2 Multibus ESDI disk controller - SGI's "sii", the
-    controller a real IRIS 3130 boots from.
-
-    This is the board that makes the machine a 3130 rather than a 3115. /etc/brc maps 3030|3120B|3130
-    to root=si0a usr=si0f and 3020|3115 to md0a/md0c, so as long as the disk is on a DSD 5217 the only
-    honest answer for /etc/model is 3115. sys/conf/proto_dv2000 is the definitive statement of where
-    it lives and is the only place in the tree that says so:
-
-        controller  sii0  at mb0 csr 0x7200  priority 5 vector siiintr
-        disk        si0   at sii0 drive 0
-        disk        si1   at sii0 drive 1
-        disk        sf0   at sii0 drive 2 flags 0x01
-        controller  siq0  at mb0 csr 0x73fc  priority 5 vector siqintr
-        tape        sq0   at siq0 drive 0
-
-    The board decodes a 512 byte block of Multibus I/O at 0x7200. Three things live in it:
-
-        0x000-0x01F   the control words - one per IOPB, plus the IOPB count register
-        0x020-0x1DF   fourteen 32 byte IOPBs of on-board RAM, used in queued mode
-        0x1F8-0x1FF   R0-R7, the command/status registers
-
-    Everything above is in MULTIBUS byte offsets. The IP2 crosses the byte lanes, so Multibus byte N
-    is the byte the 68020 wrote at N ^ 1 - which is why siireg.h defines ST_R0 as 0x1F9 and ST_R1 as
-    0x1F8 rather than the other way round, and why dsd.c's probe says "remember that the port address
-    has to be byte swapped" and XORs it by hand. Read8/Write8 below do that crossing once so the rest
-    of this file can work in the board's own byte order.
-
-    Unlike the DSD 5217 this controller is only *partly* a bus master. It fetches its IOPB from
-    Multibus memory in the ordinary (non queued) mode, but in queued mode the IOPBs are its own RAM
-    and the host writes them through this window. Data buffers are always Multibus memory.
-
-    Sources:
-        3.7/sys/multibus/sii.c      - the driver, and the only specification of the probe sequence
-        3.7/sys/multibus/siireg.h   - registers, the IOPB and the UIB, with the swapped offsets in
-                                      the comments of each struct
-        3.7/sys/multibus/siilist.h  - the command and error code lists
-        3.7/sys/multibus/siiuib.h   - the three UIBs attach tries before it has read a label
+    storager2.hpp: The Interphase Storager 2 Multibus ESDI disk controller - SGI's "sii", what makes this a 3130
 */
 
 #pragma once
@@ -52,17 +16,7 @@
 
 namespace Motion
 {
-    /*
-        The address decode, in 68020 addresses.
-
-        The block really runs to 0x73FF, but the top four bytes are R4-R7 and R4-R7 *are* siq0 -
-        "controller siq0 at mb0 csr 0x73fc" is the same silicon answering as a second logical device,
-        exactly the way qic0 and dsd0 both sit at 0x7f00. siqprobe() does nothing but touch its R2 and
-        return CONF_ALIVE, so anything answering there conjures a tape controller out of nothing and
-        then hangs siqattach initialising a drive that is not fitted. There is no tape here, so the
-        four bytes are deliberately left to bus error and siq0 keeps saying "not installed", which is
-        true. Fitting a QIC02 tape means implementing siq.c's half of the board, not widening this.
-    */
+    // 68020 addresses. Stops at 0x73FB on purpose: R4-R7 *are* siq0, and siqprobe() returns CONF_ALIVE for anything that answers there.
     #define STORAGER2_MBIO_START                0x50007200
     #define STORAGER2_MBIO_END                  0x500073FB
 
@@ -105,20 +59,7 @@ namespace Motion
     #define STORAGER2_SC_INTBON                 0x02
     #define STORAGER2_SC_ENIOPB                 0x80
 
-    /*
-        The IOPB, in Multibus byte offsets. siireg.h declares it as host shorts, so every 16 bit field
-        comes out of the struct with its halves the other way up - iop->cyl is written as swapb(cyl)
-        and iop->head_unit as (head << 8) | unit. Uncross the lanes on top of that and what the board
-        sees is this, which is the layout the Interphase manual would give:
-
-            0   command             8-9   sector           (big endian)
-            1   options             10-11 sector count     (big endian)
-            2   status              12    dma burst length
-            3   error               13-15 buffer address   (big endian, 24 bit)
-            4   unit                16-19 host scratch - the driver stashes its struct buf * here
-            5   head
-            6-7 cylinder (big endian)
-    */
+    // The IOPB in Multibus byte offsets, spelled out byte by byte in stand/include/stdreg.h's comments.
     #define STORAGER2_IOPB_OFF_COMMAND          0x00
     #define STORAGER2_IOPB_OFF_OPTIONS          0x01
     #define STORAGER2_IOPB_OFF_STATUS           0x02
@@ -131,13 +72,7 @@ namespace Motion
     #define STORAGER2_IOPB_OFF_BURST            0x0C
     #define STORAGER2_IOPB_OFF_BUFFER           0x0D
 
-    /*
-        What C_REPORT answers with. The standalone driver (3.7/stand/lib/dev/std.c, which is what the
-        PROM is built from) is the only caller that matters and it reads the firmware revision out of
-        the error byte as two nibbles; sifex prints the rest. None of it is load bearing - the PROM
-        only needs the command to succeed - but the firmware revision does get printed by a debug
-        build, so it may as well be a number a Storager 2 would give. The product code is a guess.
-    */
+    // What C_REPORT answers with. Nothing reads it but a debug print; stdprobe() only needs the command to succeed.
     #define STORAGER2_REPORT_FIRMWARE           0x21    // "rev 2.1", read as two nibbles
     #define STORAGER2_REPORT_EXTENSION          0x00    // release letter, 0 for none
     #define STORAGER2_REPORT_PRODUCT            0x02    // product code - a guess, nothing reads it
@@ -163,8 +98,7 @@ namespace Motion
     #define STORAGER2_C_RDABSOLUTE              0x93
     #define STORAGER2_C_READNOCACHE             0x94
 
-    // Error codes, from sii_errs[] in siilist.h. The driver runs these through dkerror() and prints
-    // the string, so getting the right one out means the console says what actually went wrong.
+    // From sii_errs[] in siilist.h - the driver prints these through dkerror(), so the right one says what went wrong.
     #define STORAGER2_ERR_NOTREADY              0x10    // disk not ready
     #define STORAGER2_ERR_BADUNIT               0x11    // invalid disk unit address
     #define STORAGER2_ERR_BADCOMMAND            0x14    // invalid command code
@@ -180,11 +114,7 @@ namespace Motion
     #define STORAGER2_ERR_BADCYLCOUNT           0x61    // maximum cylinder number specification error
     #define STORAGER2_ERR_BADHEADCOUNT          0x62    // number of heads specification error
 
-    /*
-        The Unit Initialization Block, 32 bytes, again in Multibus offsets - and here siireg.h does
-        the work for you, because every field of struct uib carries its swapped offset in a comment.
-        Note the UIB is little endian where the IOPB is big endian; that is the board, not a mistake.
-    */
+    // The 32 byte UIB, Multibus offsets. Little endian where the IOPB is big endian - that is the board, not a mistake.
     #define STORAGER2_UIB_SIZE                  0x20
     #define STORAGER2_UIB_OFF_HEADS             0x00
     #define STORAGER2_UIB_OFF_SPT               0x01
@@ -202,12 +132,7 @@ namespace Motion
     // The only sector size this understands, and the only one SGI ever formats a drive with.
     #define STORAGER2_BLOCK_SIZE                512
 
-    /*
-        Multibus interrupt 5. "priority 5 vector siiintr" in the config, and the vector PROM turns
-        Multibus level 5 into vector 0x45, which the kernel points at level5() - and siiintr() is the
-        first thing level5() calls. Note that a level 5 nobody claims panics after twenty strays, so
-        this line is only ever driven for a queued completion the driver is going to come and collect.
-    */
+    // Multibus 5 -> vector 0x45 -> level5() -> siiintr(). Only ever driven for a completion the driver will collect: a stray level 5 panics.
     #define STORAGER2_MULTIBUS_IRQ_LEVEL        5
 
     #define STORAGER2_LOG_PREFIX                "Storager 2"
@@ -271,25 +196,21 @@ namespace Motion
 
         Multibus* multibus = nullptr;
 
-        // The board's 512 bytes, in Multibus byte order. The IOPB ring is real RAM as far as the host
-        // is concerned - siistart() stashes its struct buf * in each one and siiintr() reads it back.
+        // The board's 512 bytes in Multibus order. The IOPB ring is real RAM: siistart() stashes a struct buf * in each.
         uint8_t io[STORAGER2_MBIO_SIZE] = {0};
 
         Drive drives[STORAGER2_MAX_UNITS];
 
-        // R1/R2/R3 hold the Multibus address of the IOPB in the ordinary mode. All ones means "the
-        // IOPBs are your own RAM", which is how siistart() asks for queued mode.
+        // The IOPB's Multibus address, from R1/R2/R3. All ones is siistart() asking for queued mode.
         uint32_t iopbAddress = 0;
 
         bool queueMode = false;
 
-        // The ordinary (non queued) half of DONE/ERROR. Queued completions carry their own, because
-        // several can be outstanding at once and siiintr() reports whichever is at the head.
+        // The non-queued half of DONE/ERROR; queued completions carry their own, since several can be outstanding.
         bool done = false;
         bool error = false;
 
-        // A reset is not instant - the board runs a self test, and siiprobe() depends on seeing DONE
-        // clear and then set. Counted in status reads rather than in time; see ResetController().
+        // The reset self test, counted in status reads rather than time. See ReadStatusRegister().
         int32_t resetSettleReads = 0;
 
         Completion completions[STORAGER2_NUM_IOPBS + 2] = {0};
@@ -299,8 +220,7 @@ namespace Motion
         bool irqAsserted = false;
         bool logEnabled = false;
 
-        // Multibus byte N is the byte the 68020 wrote at N ^ 1, for our own registers and for the
-        // memory we DMA through alike.
+        // Multibus byte N is the byte the 68020 wrote at N ^ 1.
         uint8_t MBRead8(size_t mbAddr) { return multibus->ReadMB8(mbAddr ^ 1); };
         void MBWrite8(size_t mbAddr, uint8_t value) { multibus->WriteMB8(mbAddr ^ 1, value); };
 
@@ -313,8 +233,7 @@ namespace Motion
         void ResetController();
         void ClearCompletion();
 
-        // An IOPB either lives in Multibus memory or in our own window, and every path that touches
-        // one needs to work either way round.
+        // An IOPB lives either in Multibus memory or in our own window, so every path has to work both ways.
         uint8_t IOPBRead8(bool queued, size_t base, size_t offset);
         void IOPBWrite8(bool queued, size_t base, size_t offset, uint8_t value);
         void FetchIOPB(bool queued, size_t base, IOPB& out);

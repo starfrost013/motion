@@ -24,9 +24,7 @@
 namespace Motion
 {
     Cvar* logKeyboard;
-    // Unknown keys have to be dropped rather than sent. operator[] would insert a zero and return
-    // it, and button 0 is the BREAK KEY - so every key this does not know about would send a break
-    // to the console.
+    // find(), not operator[]: that would insert a zero and return it, and button 0 is the BREAK KEY.
     bool KeyboardIris::LookupScancode(uint32_t key, uint8_t& scancode)
     {
         auto entry = sdlToSgi.find((SDL_Keycode)key);

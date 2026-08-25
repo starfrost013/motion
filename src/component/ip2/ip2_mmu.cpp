@@ -103,8 +103,7 @@ namespace Motion
             case REG_STATUS:
                 status = value;
 
-                // ST_ENABINT is the master interrupt enable. The register lives here but the logic it
-                // gates does not, so hand it over.
+                // ST_ENABINT is the master interrupt enable; the register lives here but the logic it gates does not.
                 if (!interrupts)
                     interrupts = Emulation::GetMachine()->FindComponentByType<IP2Interrupt>();
 
@@ -226,11 +225,7 @@ namespace Motion
 
         bool limitReached = limitValue && pageNumber > limitValue;
 
-        // base + page number can index past the end of the table - osBase is 0x3e00 while the PROM is
-        // running, so any kernel segment address at or above 0x20200000 lands at 0x4000 or beyond.
-        // That is a fault, not something to read out of bounds for, and it must not be masked back
-        // into range either: 0x4000 & 0x3fff is entry 0, which is a perfectly valid mapping and turns
-        // the fault into a silent alias.
+        // base + page can index past the table, and must fault rather than be masked back: 0x4000 & 0x3fff is entry 0, a silent alias.
         if (finalPageNumber >= PAGETABLE_MAX_PAGES)
         {
             if (faultsLogged < IP2MMU_MAX_FAULTS_LOGGED)
@@ -256,9 +251,7 @@ namespace Motion
                 || !(page & MMU_MASK_IS_PROTECTED)
                 || ((page & MMU_MASK_IS_PROTECTED) == MMU_MASK_SUPERVISOR_ONLY) && !(cpu->IsPrivilegedMode()))
             {
-                // These are the conditions MAME's sgi_ip2_device uses, and they match the inputs of the
-                // BERR PAL on sheet 16 of the IP2 schematic: the limit comparator, the two protection
-                // bits out of the map, WRITE, and FC2 for supervisor/user.
+                // MAME's sgi_ip2_device conditions, matching the BERR PAL on sheet 16: limit, the two protection bits, WRITE and FC2.
                 busError = true; 
             }
 
@@ -272,9 +265,7 @@ namespace Motion
                 || (page & MMU_MASK_IS_PROTECTED) == MMU_MASK_READ_ONLY // cannot write to readonly 
                 || ((page & MMU_MASK_IS_PROTECTED) == MMU_MASK_SUPERVISOR_ONLY) && !(cpu->IsPrivilegedMode()))
             {
-                // These are the conditions MAME's sgi_ip2_device uses, and they match the inputs of the
-                // BERR PAL on sheet 16 of the IP2 schematic: the limit comparator, the two protection
-                // bits out of the map, WRITE, and FC2 for supervisor/user.
+                // MAME's sgi_ip2_device conditions, matching the BERR PAL on sheet 16: limit, the two protection bits, WRITE and FC2.
                 busError = true; 
             }
 
@@ -284,8 +275,7 @@ namespace Motion
 
         if (busError)
         {
-            // Not fatal any more: the CPU turns this into exception vector 2 and the OS gets to deal
-            // with it. Rate limited because a fault storm would otherwise bury every other message.
+            // Not fatal - the CPU turns it into vector 2 and the OS deals with it. Rate limited so a storm cannot bury the log.
             if (faultsLogged < IP2MMU_MAX_FAULTS_LOGGED)
             {
                 faultsLogged++;
@@ -301,10 +291,7 @@ namespace Motion
         }
         
         // calculate a real physical ram address with 13...0 page adn teh bottom1 0 bits of the real address
-        // Pages are 4KB - the page number is addr >> 12, and the PROM fills 256 PTEs per megabyte,
-        // so the offset kept from the virtual address has to be 12 bits. With a 13-bit mask, bit 12
-        // of the virtual address gets ORed into bit 12 of the frame number: harmless while the PROM
-        // maps physical == virtual, fatal as soon as the kernel installs a real mapping.
+        // 4KB pages, so the offset kept is 12 bits: a 13-bit mask ORs VA bit 12 into the frame number and dies once the kernel maps for real.
         *finalAddress = (page & PAGETABLE_FRAME_MASK) << 12 | (addr & 0xFFF);
         //Logger::Log(LOG_PREFIX_IP2MMU, std::format("Translated virtual address {:x} to physical address {:x}", addr, *finalAddress).c_str(), LogChannels::Debug);
         return true; 

@@ -36,8 +36,7 @@ namespace Motion
     void IRIS3130::AddComponents()
     {
         AddComponent<Memory>();
-        // PROM and PROM SRAM come before the CPU on purpose: both are early start, and the reset vector
-        // and reset stack pointer live in them, so they have to be mapped before the CPU is reset.
+        // Before the CPU on purpose: the reset vector and stack pointer live in them and must be mapped before reset.
         AddComponent<PROM>();
         AddComponent<PROM_SRAM>();
         AddComponent<MC68020>();

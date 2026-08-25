@@ -113,8 +113,7 @@ namespace Motion
 
         DiskWriteMode mode = DiskImage::ModeFromString(diskWriteMode->GetString());
 
-        // Disks live in the profile folder like everything else, and DiskImage takes the path as
-        // given, so resolve it here rather than inside it.
+        // DiskImage takes the path as given, so resolve it against the profile folder here.
         char resolved[STRING_MAX_PATH] = {0};
         GetProfileFolderPath(hddPath, resolved);
 
@@ -128,8 +127,7 @@ namespace Motion
 
         if (!image)
         {
-            // An empty drive bay is the normal case for the second drive, so only shout about an
-            // image that is there and will not open.
+            // An empty second bay is normal, so only shout about an image that is there and will not open.
             bool exists = std::filesystem::exists(resolved);
 
             Logger::Log(PROFILE_LOG_PREFIX, std::format("HDD {}: {}", id, exists

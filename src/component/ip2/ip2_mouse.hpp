@@ -40,8 +40,7 @@ namespace Motion
     #define MOUSE_BUTTON_MIDDLE         (1 << 1)
     #define MOUSE_BUTTON_LEFT           (1 << 2)
 
-    // Not a button: the PROM reads this bit to tell a Rev B board from a Rev A one. Held clear, because
-    // a Rev A board is what the rest of this emulator models - Rev B makes the PROM program DUART1 too.
+    // Not a button - the PROM reads it to tell Rev B from Rev A. Held clear, because Rev A is what the rest of this models.
     #define MOUSE_BOARD_REVISION_B      (1 << 4)
 
     /*

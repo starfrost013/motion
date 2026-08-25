@@ -61,8 +61,7 @@ namespace Motion
     */
     bool Memory::IsInRange(size_t addr, size_t width, const char* what)
     {
-        // The whole operand has to fit, not just its first byte - a long read one byte short of the
-        // end of RAM used to run three bytes off the end of the allocation.
+        // The whole operand has to fit: a long read one byte short of the end used to run off the allocation.
         if (addr < GetRamCapacity()
         && width <= (GetRamCapacity() - addr))
             return true;

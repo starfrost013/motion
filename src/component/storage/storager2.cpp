@@ -4,17 +4,7 @@
 
     Copyright (c)2026 starfrost
 
-    storager2.cpp: The Interphase Storager 2 Multibus ESDI disk controller - SGI's "sii".
-
-    The whole of this file works in MULTIBUS byte offsets. The IP2 crosses the byte lanes, so Multibus
-    byte N is the byte the 68020 wrote at N ^ 1; Read8 and Write8 uncross that once on the way in and
-    MBRead8/MBWrite8 do the same for the memory the board DMAs through. Every offset named in
-    storager2.hpp is therefore the offset the controller's own firmware would use, not the one the
-    driver writes - which is why R0 is at 0x1F8 here and ST_R0 is 0x1F9 in siireg.h.
-
-    Commands are executed synchronously, inside the store that starts them. A real board takes a
-    revolution or two; nothing in the driver depends on that, and pretending to be instant removes a
-    whole class of races that would otherwise need a scheduler.
+    storager2.cpp: The Interphase Storager 2 - "sii". Everything here is in MULTIBUS byte offsets; Read8/Write8 uncross the lanes once
 */
 
 #include <component/storage/storager2.hpp>
@@ -45,11 +35,7 @@ namespace Motion
 
         multibus->AddSlotMapping(slot);
 
-        /*
-            si0 and si1, the machine's two physical drives - profileDisk0Path and profileDisk1Path.
-            The controller also carries a floppy on unit 2 and a QIC tape as siq0, neither of which is
-            emulated, so those units stay empty and report not installed.
-        */
+        // si0 and si1, the machine's two physical drives. The floppy on unit 2 and the QIC tape are not emulated.
         for (int32_t i = 0; i < STORAGER2_MAX_WINCHESTERS; i++)
         {
             drives[i].image = Profile::OpenDisk(i);
@@ -88,14 +74,11 @@ namespace Motion
         if (!logEnabled)
             return;
 
-        // Not LogChannels::Debug: logging.hpp drops the whole Debug channel when RELEASE is
-        // defined, and RelWithDebInfo defines it. The cvar is the gate instead.
+        // Not LogChannels::Debug - logging.hpp drops that channel under RELEASE, which RelWithDebInfo defines.
         Logger::Log(STORAGER2_LOG_PREFIX, message.c_str());
     }
 
-    //
     // The window. Everything below this line is in Multibus byte order.
-    //
 
     uint8_t Storager2::Read8(size_t addr)
     {
@@ -119,13 +102,7 @@ namespace Motion
 
         io[mbOffset] = value;
 
-        /*
-            The control words. One byte per IOPB at even offsets 0x00 to 0x1A, and writing one with
-            SC_ENIOPB set is how siistart() hands that IOPB to the board. 0x1C-0x1F are the overlapped
-            seek enable and the IOPB count, which are recorded and otherwise ignored - the count only
-            matters to a board that is walking the ring on its own, and this one is told about every
-            IOPB explicitly.
-        */
+        // One control word per IOPB at even offsets 0x00-0x1A; SC_ENIOPB is siistart() handing it over. 0x1C-0x1F are recorded and ignored.
         if (mbOffset < (STORAGER2_NUM_IOPBS * STORAGER2_CW_STRIDE)
         && !(mbOffset & 1)
         && (value & STORAGER2_SC_ENIOPB))
@@ -136,13 +113,7 @@ namespace Motion
 
             bool ok = ExecuteIOPB(true, base);
 
-            /*
-                Completions queue. The driver runs siistart() under spl6 and can hand over several
-                IOPBs before the level 5 handler gets a chance to run, so a single "which unit
-                interrupted" register would lose all but the last of them - and a lost completion is a
-                buffer that is never iodone()d, which is a wedged filesystem. R0 and R1 report the head
-                of this queue and ST_CLEAR pops it, exactly like a real fourteen deep board.
-            */
+            // Completions queue: siistart() runs under spl6 and can finish several IOPBs before the handler runs, and a lost one is a buf never iodone()d.
             if (completionCount < (int32_t)(sizeof(completions) / sizeof(completions[0])))
             {
                 int32_t slot = (completionHead + completionCount) % (int32_t)(sizeof(completions) / sizeof(completions[0]));
@@ -184,9 +155,7 @@ namespace Motion
         Write16(addr + 2, (uint16_t)(value & 0xFFFF));
     }
 
-    //
     // R0-R3. R4-R7 are the tape half of the board and are not decoded at all; see storager2.hpp.
-    //
 
     uint8_t Storager2::ReadRegister(size_t mbOffset)
     {
@@ -195,11 +164,7 @@ namespace Motion
         case 0:
             return ReadStatusRegister();
         case 1:
-            /*
-                RDINTR - which unit and which IOPB caused the interrupt. siiintr() takes the IOPB index
-                from bits 3-6 and the unit from bits 0-2, and bails out without touching anything if
-                the unit is above 3, which is its way of ignoring the tape's interrupts.
-            */
+            // RDINTR: IOPB index in bits 3-6, unit in bits 0-2. siiintr() ignores anything above unit 3 as the tape's.
             if (completionCount > 0)
                 return (uint8_t)((completions[completionHead].iopb << 3) | (completions[completionHead].unit & 0x07));
 
@@ -237,18 +202,7 @@ namespace Motion
 
     uint8_t Storager2::ReadStatusRegister()
     {
-        /*
-            The reset self test. siiprobe() writes ST_RESET, waits for DONE to go *away*, then waits
-            for it to come *true*, and treats a timeout on either as CONF_DEAD - so a board that
-            answers DONE the instant it is reset probes as dead just as surely as one that never
-            answers at all. The wait is counted in status reads rather than in emulated microseconds
-            because the driver's timeouts are spin loops: tying this to the clock means the answer
-            depends on how fast the host is running the 68020 that day, and counting reads cannot
-            deadlock however fast or slow that is.
-        */
-        // Not on a debugger read - the memory editor drawing this register must not be what advances
-        // the self test, or the probe sees DONE come true early and depends on where the debugger is
-        // pointed. See AddrSpacePeek.
+        // The reset self test, counted in status reads and not on a debugger read: siiprobe() wants DONE to go away and then come true.
         if (resetSettleReads > 0
         && !AddrSpace::IsPeeking())
         {
@@ -260,11 +214,7 @@ namespace Motion
 
         uint8_t value = 0;
 
-        /*
-            ST_BUSY never comes back set: a command finishes inside the store that starts it, so there
-            is no window in which the host could see the board working. siicmd() spins on this before
-            every command and is happy to find it clear.
-        */
+        // ST_BUSY never reads set: a command finishes inside the store that starts it, and siicmd() is happy to find it clear.
         if (completionCount > 0)
         {
             value |= STORAGER2_ST_DONE;
@@ -282,18 +232,13 @@ namespace Motion
         if (queueMode)
             value |= STORAGER2_ST_QUEUEMODE;
 
-        /*
-            ST_IOPBMASK is 0x78 and overlaps ST_ERROR at bit 3, so the two cannot both be reported
-            here. The driver reads the IOPB index out of R1 and only ever tests ST_ERROR in R0, so the
-            error bit wins.
-        */
+        // ST_IOPBMASK (0x78) overlaps ST_ERROR at bit 3, so only one can be reported - and the driver takes the IOPB index from R1 anyway.
         return value;
     }
 
     void Storager2::WriteCommandRegister(uint8_t value)
     {
-        // Order matters: STARTWO() is ST_START | ST_NOINTERRUPT, so the action bits have to be tested
-        // rather than the whole byte compared.
+        // Test the action bits, not the whole byte: STARTWO() is ST_START | ST_NOINTERRUPT.
         if (value & STORAGER2_CMD_RESET)
         {
             ResetController();
@@ -323,11 +268,7 @@ namespace Motion
         if (!(value & STORAGER2_CMD_START))
             return;
 
-        /*
-            All ones in R1/R2/R3 is not an IOPB address, it is siistart() asking to go into queued
-            mode: from here on the IOPBs are the board's own RAM and each one is launched by its
-            control word rather than by a start command.
-        */
+        // All ones is not an address, it is siistart() asking for queued mode: the IOPBs become our RAM, launched by control word.
         if (iopbAddress == MULTIBUS_ADDRESS_MASK)
         {
             if (!queueMode)
@@ -353,13 +294,7 @@ namespace Motion
         done = true;
         error = !ok;
 
-        /*
-            A non queued command never raises the interrupt here even when the host forgets
-            ST_NOINTERRUPT. siiintr() answers an interrupt by reading an IOPB index out of R1 and
-            dereferencing the struct buf * the driver left in that IOPB - and a non queued command has
-            no IOPB in the ring and no buf, so servicing one would find a null pointer and panic. Every
-            caller in sii.c uses STARTWO(), so this only guards against a path that does not exist.
-        */
+        // Never interrupt for a non-queued command: siiintr() would dereference a struct buf * that does not exist and panic.
         if (!(value & STORAGER2_CMD_NOINTERRUPT))
             Logger::Log(STORAGER2_LOG_PREFIX, "A non-queued command asked for an interrupt; there is no IOPB for the "
                 "handler to find, so it has been suppressed", LogChannels::Warning);
@@ -385,11 +320,7 @@ namespace Motion
 
     void Storager2::ClearCompletion()
     {
-        /*
-            ST_CLEAR acknowledges one completion. Anything left in the queue keeps DONE set and the
-            interrupt asserted, so the handler is re-entered and collects the next one - which is the
-            only way several IOPBs finishing inside one spl6 region all get reported.
-        */
+        // ST_CLEAR acknowledges one completion; anything left keeps DONE and the interrupt up so the handler collects the next.
         done = false;
         error = false;
 
@@ -403,9 +334,7 @@ namespace Motion
             ClearIRQLine();
     }
 
-    //
     // IOPB execution
-    //
 
     uint8_t Storager2::IOPBRead8(bool queued, size_t base, size_t offset)
     {
@@ -461,11 +390,7 @@ namespace Motion
             ok = Initialise(iopb, errorCode);
             break;
 
-        /*
-            Read absolute skips the bad block map, and read-no-cache is what attach uses to be sure it
-            is looking at the platter rather than at whatever the last command left in the buffer.
-            There is no cache and no bad block map here, so all three are the same read.
-        */
+        // No cache and no bad block map here, so read, read-absolute and read-no-cache are all the same read.
         case STORAGER2_C_READ:
         case STORAGER2_C_READNOCACHE:
         case STORAGER2_C_RDABSOLUTE:
@@ -489,12 +414,7 @@ namespace Motion
             break;
         }
 
-        /*
-            C_REPORT is a controller command, not a drive one: stdprobe() issues it with unit 0 before
-            it has looked for a drive at all, and treats a failure as CONF_DEAD. It is the whole
-            reason the PROM could not boot off this board - it got as far as asking and got an
-            "invalid command code" back.
-        */
+        // A controller command, not a drive one: stdprobe() issues it before looking for a drive, and this is why the PROM could not boot us.
         case STORAGER2_C_REPORT:
             IOPBWrite8(queued, base, STORAGER2_IOPB_OFF_ERROR, STORAGER2_REPORT_FIRMWARE);
             IOPBWrite8(queued, base, STORAGER2_IOPB_OFF_UNIT, STORAGER2_REPORT_EXTENSION);
@@ -528,22 +448,14 @@ namespace Motion
 
         IOPBWrite8(queued, base, STORAGER2_IOPB_OFF_STATUS, ok ? STORAGER2_S_OK : STORAGER2_S_ERROR);
 
-        // Only touch the error byte when there is an error to report. Both drivers zero it before
-        // every command, and C_REPORT has already put its firmware revision there.
+        // Only on an error: both drivers zero it beforehand, and C_REPORT has already put its revision there.
         if (!ok)
             IOPBWrite8(queued, base, STORAGER2_IOPB_OFF_ERROR, errorCode);
 
         return ok;
     }
 
-    /*
-        C_INIT - take a Unit Initialization Block and believe what it says about the drive. A real
-        controller checks the geometry against the drive it can actually see, which is how siiattach()
-        can walk sii_uibs[] trying a hard sectored ESDI, then a soft sectored one, then an ST506 until
-        one takes. There is only ever one kind of drive here, so every UIB is accepted and the loop
-        stops at the first - and then attach reads the label and re-initialises with the real geometry
-        out of it, which is the one that matters.
-    */
+    // C_INIT: believe the UIB. Every one is accepted, so siiattach()'s walk of sii_uibs[] stops at the first - then it re-inits from the label anyway.
     bool Storager2::Initialise(const IOPB& iopb, uint8_t& errorOut)
     {
         if (iopb.unit >= STORAGER2_MAX_UNITS)
@@ -680,8 +592,7 @@ namespace Motion
             return false;
         }
 
-        // Only the first megabyte of the backplane is a window onto system RAM, so anything past it
-        // wraps and lands somewhere silly rather than where the host meant.
+        // Only the first megabyte of the backplane is a window onto RAM; past it the address wraps.
         if ((iopb.bufferAddress + length) > MULTIBUS_SLAVE_WINDOW_END)
             Logger::Log(STORAGER2_LOG_PREFIX, std::format("Transfer to 0x{:x}..0x{:x} leaves the emulated 1MB multibus window and will wrap",
                 iopb.bufferAddress, iopb.bufferAddress + length).c_str(), LogChannels::Warning);
@@ -702,11 +613,7 @@ namespace Motion
             {
                 size_t i = 0;
 
-                /*
-                    The byte lanes are crossed, so a 16-bit read at an even address gives the byte at
-                    that address in the low half. Anything odd, or a trailing byte, goes one at a time
-                    through MBRead8, which does the crossing itself.
-                */
+                // Crossed lanes: a 16-bit read at an even address puts that address's byte in the low half. Odd or trailing bytes go through MBRead8.
                 if (!(buffer & 1))
                 {
                     for (; (i + 1) < chunk; i += 2)
@@ -721,8 +628,7 @@ namespace Motion
                 for (; i < chunk; i++)
                     sector[i] = MBRead8(buffer + i);
 
-                // Where this lands depends on the mode - straight to the file, or into the
-                // copy-on-write overlay. See disk_image.hpp.
+                // Straight to the file or into the copy-on-write overlay, depending on the mode. See disk_image.hpp.
                 if (!drive.image->Write(linear + transferred, sector, chunk))
                 {
                     Logger::Log(STORAGER2_LOG_PREFIX, std::format("Write of {} bytes at 0x{:x} failed",
@@ -745,8 +651,7 @@ namespace Motion
 
                 size_t i = 0;
 
-                // The other way round: writing (sector[i + 1] << 8) | sector[i] as a 16-bit word puts
-                // sector[i] at multibus address buffer + i and sector[i + 1] at buffer + i + 1.
+                // The other way round: that 16-bit word puts sector[i] at buffer + i and sector[i + 1] at buffer + i + 1.
                 if (!(buffer & 1))
                 {
                     for (; (i + 1) < chunk; i += 2)
@@ -778,8 +683,7 @@ namespace Motion
 
     void Storager2::ClearIRQLine()
     {
-        // The Multibus interrupt lines are shared and there is no arbitration in here, so only drop
-        // one this board actually raised.
+        // The Multibus interrupt lines are shared with no arbitration here, so only drop one this board raised.
         if (!irqAsserted)
             return;
 

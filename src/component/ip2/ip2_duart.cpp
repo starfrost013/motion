@@ -140,8 +140,7 @@ namespace Motion
                 duart.counterRunning = true;
                 break;
             case DUART_READ_STOP_COUNTER_CMD:
-                // Latch where the counter got to before stopping it - the whole point of the command
-                // is that the host then reads CTU/CTL to see how long something took.
+                // Latch where the counter got to: the host then reads CTU/CTL to see how long something took.
                 UpdateCounter(duartId);
                 duart.counterRunning = false;
                 duart.isr &= ~DUART_INT_COUNTER_READY;
@@ -499,8 +498,7 @@ namespace Motion
 
     uint64_t DUART68681::GetCounterTickNs(int32_t duartId)
     {
-        // ACR[6:4]: 011 counter from X1/16, 110 timer from X1, 111 timer from X1/16. The other four
-        // select the external IP2 pin or one of the transmitter clocks, none of which are connected.
+        // ACR[6:4]: 011 counter X1/16, 110 timer X1, 111 timer X1/16. The rest select pins nothing is connected to.
         switch (DUART_COUNTER_MODE(duarts[duartId].auxControl))
         {
             case 3:
@@ -539,8 +537,7 @@ namespace Motion
 
         uint64_t elapsed = (now - duart.counterStartNs) / tickNs;
 
-        // The counter does not stop at zero, it rolls over and keeps going, so this is deliberately
-        // allowed to wrap - the host reads it as a 16 bit value either way.
+        // The counter rolls over rather than stopping at zero, so this is deliberately allowed to wrap.
         duart.counter = (uint16_t)(duart.counterPreset - elapsed);
 
         /*

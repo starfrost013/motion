@@ -169,8 +169,7 @@ namespace Motion
                     // get our palette address
                     uint32_t paletteValue = vram->Read32(vramAddress) & 0xFFF;
 
-                    // Advance after the read, not before it: incrementing first skips pixel 0 and
-                    // shows every pixel one place further on than where it was drawn.
+                    // Advance after the read: incrementing first skips pixel 0 and shifts every pixel one place.
                     vramAddress += 4;
 
                     /*

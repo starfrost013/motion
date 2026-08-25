@@ -43,12 +43,7 @@ namespace Motion
 
     DiskImage* DiskImage::Open(const char* path, DiskWriteMode mode)
     {
-        /*
-            Overlay and ReadOnly open the base for reading only. That is the whole guarantee - nothing
-            that happens after this point can write to the file through this handle, however the
-            emulator dies - and it also means two emulators on one image stop being able to corrupt
-            each other, because neither of them holds it for writing.
-        */
+        // Overlay and ReadOnly open read-only, which is the whole guarantee - and is why two emulators on one image stop mattering.
         std::ios_base::openmode flags = std::ios_base::in | std::ios_base::binary;
 
         if (mode == DiskWriteMode::Direct)
@@ -80,11 +75,7 @@ namespace Motion
 
     DiskImage::~DiskImage()
     {
-        /*
-            Say what is being thrown away. A boot that wrote nothing is worth no noise, but one that
-            wrote a megabyte and is about to lose it is exactly the moment somebody wants to be told
-            that diskCommitOnExit exists.
-        */
+        // Say what is being thrown away - losing a megabyte silently is how somebody learns diskCommitOnExit exists too late.
         if (mode == DiskWriteMode::Overlay
         && !overlay.empty())
         {
@@ -102,8 +93,7 @@ namespace Motion
 
     bool DiskImage::ReadBase(size_t offset, uint8_t* buffer, size_t length)
     {
-        // A short read latches eofbit and failbit, and every later seek and read on the stream then
-        // silently does nothing, so clear before touching it.
+        // A short read latches eofbit/failbit and every later access silently does nothing, so clear first.
         stream->stream.clear();
         stream->stream.seekg(offset, std::ios_base::beg);
         stream->stream.read((char*)buffer, length);
@@ -123,12 +113,7 @@ namespace Motion
         || length > (size - offset))
             return false;
 
-        /*
-            Read the whole span from the base and then paint the dirty sectors over the top. Doing it
-            in that order costs one redundant file read when a span is entirely dirty, which is worth
-            it for how much simpler it is than tracking runs of clean and dirty sectors - and the base
-            read comes out of the host page cache anyway.
-        */
+        // Read the base span, then paint dirty sectors over it: one wasted read on an all-dirty span, in exchange for not tracking runs.
         if (!ReadBase(offset, buffer, length))
             return false;
 
@@ -173,12 +158,7 @@ namespace Motion
 
         std::vector<uint8_t> contents(DISK_IMAGE_SECTOR_SIZE, 0);
 
-        /*
-            Seed the sector from the base before it joins the overlay, so a write that only covers
-            part of it leaves the rest reading as what is on the platter rather than as zeroes. A
-            short read at the very end of the image is fine - the tail stays zero, which is what a
-            sector that only partly exists would give anyway.
-        */
+        // Seed from the base first, so a partial write leaves the rest reading as the platter rather than as zeroes.
         size_t available = size - sectorStart;
 
         if (available > DISK_IMAGE_SECTOR_SIZE)
@@ -252,11 +232,7 @@ namespace Motion
         if (overlay.empty())
             return true;
 
-        /*
-            The base was opened read only, so committing needs a second handle. Reopening rather than
-            keeping a writable one around is deliberate: the point of the mode is that there is no way
-            to write to the file until somebody explicitly asks for it.
-        */
+        // A second handle, opened only now: the point of the mode is that nothing can write to the file until asked.
         std::fstream out(path, std::ios_base::in | std::ios_base::out | std::ios_base::binary);
 
         if (out.fail())

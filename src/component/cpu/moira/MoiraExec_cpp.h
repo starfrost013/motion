@@ -3312,14 +3312,7 @@ Moira::execMovemRgEa(u16 opcode)
 
         u32 ea = readA(dst);
 
-        /* A 68020 writes An back as it goes, so a bus error partway through this loop - a register
-         * save crossing onto a stack page that is not resident yet - would leave An stranded
-         * halfway and a restart would store the wrong registers at the wrong addresses. Real
-         * hardware stacks a continuation frame and resumes mid-instruction; all we can offer is a
-         * restart, so put An back where the instruction found it and let the whole thing run again.
-         * Nothing observes An between the writes unless the instruction faults, so this changes
-         * nothing on the path where it does not.
-         */
+        /* An is written back as it goes, so a fault partway leaves it stranded; we can only restart, so put it back first. */
         const u32 anOnEntry = ea;
 
         try {

@@ -305,20 +305,7 @@ Moira::execBusError(StackFrame frame, int delay)
     // A misaligned stack pointer will cause a double fault
     if (misaligned<C>(reg.sp)) throw DoubleFault();
 
-    /* Write stack frame
-     *
-     * Format 8 is the 68010 layout. A 68020 stacks format A or B instead, and the two disagree
-     * about where everything after the vector offset lives - an OS reading the special status
-     * word out of a format A frame at +0x0A finds the top half of the fault address there, and
-     * looks for the fault address itself at +0x10 where format 8 keeps the data output buffer.
-     * Handing a 68020 kernel a format 8 frame therefore reports every fault at a garbage
-     * address, and the RTE out of it raises a format error because the 68020 does not accept
-     * format 8 at all.
-     *
-     * pc0 rather than frame.pc: format A means the fault can be recovered by restarting the
-     * faulting instruction, which is the whole basis of demand paging, so the stacked PC has to
-     * be where that instruction begins.
-     */
+    /* Format A, not the 68010's format 8, which a 68020 kernel misreads and cannot RTE out of - and pc0, because format A restarts the instruction. */
     if (C == Core::C68000) {
         writeStackFrameAEBE<C>(frame);
     } else if (C == Core::C68010) {

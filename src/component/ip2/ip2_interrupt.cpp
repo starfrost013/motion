@@ -87,8 +87,7 @@ namespace Motion
         if (!cpu)
             return;
 
-        // ST_ENABINT gates the lot. MAME does the same - int_w only reaches the CPU while the enable
-        // bit in the status register is set.
+        // ST_ENABINT gates the lot, as in MAME: int_w only reaches the CPU while the status register enable is set.
         uint8_t levels = enabled ? PendingLevels() : 0;
         int32_t level = 0;
 

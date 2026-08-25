@@ -413,9 +413,7 @@ Moira::processException(const std::exception &exc)
 bool
 Moira::checkForIrq()
 {
-    // Level 7 is edge triggered rather than level sensitive: it is recognised on the transition to
-    // 7 and holding the pins there does not ask again. Everything below it is the ordinary priority
-    // comparison against the mask in the status register.
+    // Level 7 is edge triggered: recognised on the transition to 7, and holding the pins there does not ask again.
     bool nmi = (reg.ipl == 7);
 
     if (nmi ? !nmiTaken : (reg.ipl > reg.sr.ipl)) {

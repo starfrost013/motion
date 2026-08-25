@@ -25,13 +25,10 @@ namespace Motion
         SerialReceive = 4,
         SerialTransmit = 5,
 
-        // The window stopped being the one the host is typing at. Anything that tracks which keys
-        // are held has to let go of them here, because the key-up that would have done it is going
-        // to be delivered to whatever the user switched to instead.
+        // Focus lost: anything tracking held keys must let go, because their key-up goes to whatever the user switched to.
         FocusLost = 6,
 
-        // The host pointer moved. Relative, because that is all the emulated hardware can express:
-        // the IRIS mouse is a quadrature encoder that reports transitions, not a position.
+        // Relative, because the IRIS mouse is a quadrature encoder that reports transitions rather than a position.
         MouseMotion = 7,
     }; 
 
@@ -99,8 +96,7 @@ namespace Motion
     class MouseMotionEvent : public Event
     {
     public:
-        // How far the pointer moved since the last event, in host pixels. The guest screen is the
-        // same size as the window, so one host pixel is one mouse tick is one guest pixel.
+        // Movement since the last event in host pixels; the window is guest-sized, so one pixel is one tick.
         float deltaX;
         float deltaY;
 

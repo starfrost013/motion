@@ -329,8 +329,7 @@ namespace Motion
         /// @brief Bring the counter/timer up to the current time and update the counter ready bit.
         void UpdateCounter(int32_t duartId);
 
-        /// @brief Period of one counter/timer tick in nanoseconds, or 0 if ACR selects a source that
-        /// isn't connected to anything on this board.
+        /// @brief One counter/timer tick in nanoseconds, or 0 if ACR selects a source nothing is connected to.
         uint64_t GetCounterTickNs(int32_t duartId);
 
         /// @brief set the baud rate.

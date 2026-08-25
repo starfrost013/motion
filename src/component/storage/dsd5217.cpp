@@ -59,10 +59,7 @@ namespace Motion
         Coherent::RegisterExtension(dsdExtension);
     }
 
-    //
-    // Multibus access. Multibus byte N is the byte the host wrote at N ^ 1 (crossed byte lanes),
-    // and multi-byte fields are little endian as the 8085 sees them.
-    //
+    // Multibus byte N is the byte the host wrote at N ^ 1, and multi-byte fields are little endian as the 8085 sees them.
 
     uint8_t DSD5217::MBRead8(size_t mbAddr)
     {
@@ -96,9 +93,7 @@ namespace Motion
         MBWrite16(mbAddr + 2, (value >> 16) & 0xFFFF);
     }
 
-    //
     // Chaining through the control blocks, exactly as 4.6.3 - 4.6.7 of the 5215 guide describe it
-    //
 
     bool DSD5217::FetchWakeUpBlock()
     {
@@ -176,8 +171,7 @@ namespace Motion
     {
         ccb.busy = busy ? 0xFF : 0x00;
 
-        // "The busy flag is posted when the controller is busy processing a command, and cleared
-        // after the command is completed." Note the programmed I/O port must never touch this.
+        // "posted when the controller is busy processing a command, and cleared after" - the I/O port must never touch it.
         if (wub.ccbPtr)
             MBWrite8((wub.ccbPtr & DSD5217_BLOCK_PTR_MASK) + 0x01, ccb.busy);
     }
@@ -190,8 +184,7 @@ namespace Motion
         {
             size_t cibAddr = CIBAddress();
 
-            // "it examines the status semaphore byte in the CIB. If it is zero, the controller assumes
-            // that previous status information has been accepted by the host."
+            // "if it is zero, the controller assumes that previous status information has been accepted by the host"
             if (MBRead8(cibAddr + 0x03))
                 Logger::Log(DSD5217_LOG_PREFIX, "Host hasn't picked up the previous status yet, overwriting it", LogChannels::Debug);
 
@@ -207,9 +200,7 @@ namespace Motion
             AssertIRQLine();
     }
 
-    //
     // Programmed I/O. Only writes are recognised, and only the bottom two bits of them.
-    //
 
     uint8_t DSD5217::Read8(size_t addr)
     {
@@ -219,8 +210,7 @@ namespace Motion
 
     void DSD5217::Write8(size_t addr, uint8_t value)
     {
-        // With no drive fitted at all the board does not answer its port, which is what it did
-        // before there was more than one drive and is what makes dsd0 probe as absent.
+        // With no drive fitted the board does not answer its port at all, which is what makes dsd0 probe as absent.
         if (!drives[0].image
         && !drives[1].image)
             return;
@@ -235,9 +225,7 @@ namespace Motion
         switch (value & DSD5217_IO_COMMAND_MASK)
         {
         case DSD5217_IO_CLEAR:
-            // Clear: drops a pending interrupt and removes the reset condition. It deliberately does
-            // NOT touch the busy flag - SGI's driver issues one of these after every single command,
-            // so anything that marks the controller busy here wedges the next one.
+            // Drops the interrupt and the reset, and deliberately NOT the busy flag - SGI issues one after every command.
             ClearIRQLine();
             inReset = false;
             break;
@@ -442,19 +430,7 @@ namespace Motion
         return true;
     }
 
-    // Read Data (04h)
-    /*
-        Write Data, the mirror of ReadSector below and sharing all of its addressing. Until this
-        existed the guest could not put a byte on the disk, which is a great deal more than an
-        inconvenience: /etc/brc asks for the machine's model number on every boot because it can only
-        stop asking once /etc/model exists, and /etc/bcheckrc asks about the date and the filesystem
-        for the same reason. Nothing the machine was told could be remembered.
-
-        A partial last sector is written short rather than read-modify-written. That is the same
-        answer a real controller arrives at the long way round - it would read the sector into its
-        buffer, overlay the bytes it was given and write the whole thing back, and the bytes it did
-        not overlay are the ones already on the disk.
-    */
+    // Write Data (05h), the mirror of ReadSector below. A partial last sector is written short rather than read-modify-written.
     bool DSD5217::WriteSector()
     {
         size_t bytesPerSector = GetBytesPerSector();
@@ -534,8 +510,7 @@ namespace Motion
             for (; i < bytesToTransfer; i++)
                 sectorBuffer[i] = MBRead8(source + i);
 
-            // Where this lands depends on the mode - straight to the file, or into the copy-on-write
-            // overlay. See disk_image.hpp.
+            // Straight to the file or into the copy-on-write overlay, depending on the mode. See disk_image.hpp.
             if (!currentDrive->image->Write(diskLinear + transferred, sectorBuffer, bytesToTransfer))
             {
                 Logger::Log(DSD5217_LOG_PREFIX, std::format("Write of {} bytes at 0x{:x} failed",
@@ -585,8 +560,7 @@ namespace Motion
         if (iopb.rbc == 0)
             iopb.rbc = (uint32_t)bytesPerSector;
 
-        // The 5217 addresses 24 bits of Multibus, but we only model the one megabyte window the IP2
-        // aliases into the top of system RAM, so anything above that wraps and lands somewhere silly.
+        // The 5217 drives 24 address bits but only the IP2's one megabyte window is modelled, so anything above it wraps.
         if ((iopb.dba + iopb.rbc) > 0xFFFFF)
             Logger::Log(DSD5217_LOG_PREFIX, std::format("Transfer to 0x{:x}..0x{:x} leaves the emulated 1MB multibus window and will wrap",
                 iopb.dba, iopb.dba + iopb.rbc).c_str(), LogChannels::Warning);
@@ -606,8 +580,7 @@ namespace Motion
             uint32_t remaining = iopb.rbc - transferred;
             uint32_t bytesToTransfer = (remaining < bytesPerSector) ? remaining : (uint32_t)bytesPerSector;
 
-            // Clamp against what is left of the image rather than asking for a whole sector and
-            // seeing how much comes back - DiskImage refuses a read that runs off the end outright.
+            // Clamp against what is left of the image: DiskImage refuses a read that runs off the end outright.
             size_t imageSize = currentDrive->image->GetSize();
             size_t remainingOnDisk = (diskLinear + transferred < imageSize)
                 ? (imageSize - (diskLinear + transferred)) : 0;
@@ -707,8 +680,7 @@ namespace Motion
 
     void DSD5217::ClearIRQLine()
     {
-        // Only drop the line if it was us who raised it - the multibus IRQs are shared and there is no
-        // arbitration in here yet, so clearing unconditionally would eat somebody else's interrupt.
+        // Only drop a line this board raised - the Multibus IRQs are shared and clearing blind would eat somebody else's.
         if (!irqAsserted)
             return;
 
