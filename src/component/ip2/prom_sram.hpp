@@ -72,22 +72,21 @@ namespace Motion
             return (sram[addr]); 
         }
 
+        /*
+            Byte at a time, big endian, at the address given - see the note in memory.cpp. Read32 had
+            a second bug on top of that one: it swapped into a uint16_t, truncating the result, and
+            then returned the *unswapped* word anyway, so every 32 bit read of the SRAM came back
+            little endian.
+        */
         uint16_t Read16(size_t addr) override 
         { 
             addr %= (size_t)SRAM_SIZE;
-            uint16_t* rom16 = (uint16_t*)sram; 
-            uint16_t value = rom16[addr >> 1];
-            TOBE16(value);
-            return value;
+            return (uint16_t)(((uint16_t)sram[addr] << 8) | sram[(addr + 1) % (size_t)SRAM_SIZE]);
         }
 
         uint32_t Read32(size_t addr) override 
         { 
-            addr %= (size_t)SRAM_SIZE;
-            uint32_t* rom32 = (uint32_t*)sram; 
-            uint16_t value = rom32[addr >> 2];
-            TOBE32(value);
-            return rom32[addr >> 2]; 
+            return ((uint32_t)Read16(addr) << 16) | Read16(addr + 2);
         }
 
         void Write8(size_t addr, uint8_t value) override
@@ -99,17 +98,14 @@ namespace Motion
         void Write16(size_t addr, uint16_t value) override
         { 
             addr %= (size_t)SRAM_SIZE;
-            uint16_t* rom16 = (uint16_t*)sram; 
-            TOBE16(value);
-            rom16[addr >> 1] = value; 
+            sram[addr] = (uint8_t)(value >> 8);
+            sram[(addr + 1) % (size_t)SRAM_SIZE] = (uint8_t)value;
         }
 
         void Write32(size_t addr, uint32_t value) override
         { 
-            addr %= (size_t)SRAM_SIZE;
-            uint32_t* rom32 = (uint32_t*)sram; 
-            TOBE32(value);
-            rom32[addr >> 2] = value; 
+            Write16(addr, (uint16_t)(value >> 16));
+            Write16(addr + 2, (uint16_t)value);
         }
 
         void Shutdown() override

@@ -59,9 +59,12 @@ namespace Motion
         PROM's memory sizing loop depends on. The Multibus slave map can also aim a transfer at a
         frame past the end of RAM, and that has to read zero rather than corrupt a low page.
     */
-    bool Memory::IsInRange(size_t addr, const char* what)
+    bool Memory::IsInRange(size_t addr, size_t width, const char* what)
     {
-        if (addr < GetRamCapacity())
+        // The whole operand has to fit, not just its first byte - a long read one byte short of the
+        // end of RAM used to run three bytes off the end of the allocation.
+        if (addr < GetRamCapacity()
+        && width <= (GetRamCapacity() - addr))
             return true;
 
         if (outOfRangeLogged < MEMORY_MAX_OUT_OF_RANGE_LOGGED)
@@ -77,9 +80,31 @@ namespace Motion
         return false;
     }
 
+    /*
+        Every access below assembles the value a byte at a time, big endian, at the exact address it
+        was given.
+
+        It used to index a 16 or 32 bit view of the array with addr >> 1 or addr >> 2, which
+        silently threw the bottom one or two address bits away. **The 68020 permits misaligned word
+        and long operands** - unlike the 68000 and 68010, which take an address error - and splits
+        them into as many bus cycles as it needs, so a compiler is free to emit `move.l (a0)+,(a1)+`
+        over a buffer that is not four byte aligned, and IRIX's does. Rounding the address down meant
+        every such access read or wrote up to three bytes early, which shifted the data by exactly
+        (addr & 3) bytes and was invisible whenever the buffer happened to be aligned.
+
+        What that looked like: a byte lost or gained at the front of a string. `tset -s -Q` printing
+        `setenv TERM |wsiri ;` for `wsiris` (its name pointer landed one past a 4 byte boundary, so
+        every long the copy loop read came from one byte lower, dragging the preceding `|` in and
+        dropping the trailing `s`), `telinit` arriving as `elinit`, `PST8PDT` as `TPST8PDT`. It read
+        as random because it depends purely on where a buffer happens to sit.
+
+        gcc and clang both fold the byte assembly back into one unaligned load plus a bswap, so this
+        is not slower than the version that was wrong.
+    */
+
     uint8_t Memory::Read8(size_t addr)
     {
-        if (!IsInRange(addr, "Read8"))
+        if (!IsInRange(addr, sizeof(uint8_t), "Read8"))
             return 0;
 
         return ram[addr];
@@ -87,31 +112,26 @@ namespace Motion
 
     uint16_t Memory::Read16(size_t addr)
     {
-        if (!IsInRange(addr, "Read16"))
+        if (!IsInRange(addr, sizeof(uint16_t), "Read16"))
             return 0;
 
-        uint16_t* ram16 = (uint16_t*)ram;
-        uint16_t value = ram16[addr >> 1];
-        TOBE16(value);
-        return value;
+        return (uint16_t)(((uint16_t)ram[addr] << 8) | ram[addr + 1]);
     }
 
     uint32_t Memory::Read32(size_t addr)
     {
-        if (!IsInRange(addr, "Read32"))
+        if (!IsInRange(addr, sizeof(uint32_t), "Read32"))
             return 0;
 
-        uint32_t* ram32 = (uint32_t*)ram;
-        uint32_t value = ram32[addr >> 2];
-
-        // IRIS is a big-endian system.
-        TOBE32(value);
-        return value;
+        return ((uint32_t)ram[addr] << 24)
+            | ((uint32_t)ram[addr + 1] << 16)
+            | ((uint32_t)ram[addr + 2] << 8)
+            | (uint32_t)ram[addr + 3];
     }
 
     void Memory::Write8(size_t addr, uint8_t value)
     {
-        if (!IsInRange(addr, "Write8"))
+        if (!IsInRange(addr, sizeof(uint8_t), "Write8"))
             return;
 
         ram[addr] = value;
@@ -119,23 +139,22 @@ namespace Motion
 
     void Memory::Write16(size_t addr, uint16_t value)
     {
-        if (!IsInRange(addr, "Write16"))
+        if (!IsInRange(addr, sizeof(uint16_t), "Write16"))
             return;
-    
-        uint16_t* ram16 = (uint16_t*)ram;       
-        TOBE16(value);
-        ram16[addr >> 1] = value;
+
+        ram[addr] = (uint8_t)(value >> 8);
+        ram[addr + 1] = (uint8_t)value;
     }
 
     void Memory::Write32(size_t addr, uint32_t value)
     {
-        if (!IsInRange(addr, "Write32"))
+        if (!IsInRange(addr, sizeof(uint32_t), "Write32"))
             return;
 
-        uint32_t* ram32 = (uint32_t*)ram;
-        // IRIS is a big-endian system.
-        TOBE32(value);
-        ram32[addr >> 2] = value;
+        ram[addr] = (uint8_t)(value >> 24);
+        ram[addr + 1] = (uint8_t)(value >> 16);
+        ram[addr + 2] = (uint8_t)(value >> 8);
+        ram[addr + 3] = (uint8_t)value;
     }
 
     void Memory::Shutdown()

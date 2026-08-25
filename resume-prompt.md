@@ -64,9 +64,8 @@ upstream's absolute ones.
 SGI banner, the device probe lines, the RESTRICTED RIGHTS LEGEND and a `#` prompt with a cursor all
 render. With the board absent the machine still comes up on the serial line exactly as before.
 
-The remaining visible wrongness on that screen is the known `tset` bug - `setenv: Too few arguments`
-and `wsiri: Command not found` - which is the one-character class of bug described below and is not
-new.
+That screen used to also carry the `tset` mess - `setenv: Too few arguments` and
+`wsiri: Command not found`. That is gone: it was the misaligned memory access bug described below.
 
 Userland works. `/etc/rc` completes, init reaches its `initdefault` of single user and hands you a
 `#` prompt; `ls`, `cat`, `echo`, `uname`, `env`, pipes and backquote substitution are all correct.
@@ -544,39 +543,62 @@ its bounds, colour and write mask. That log is the fastest way to see what the g
 text as ASCII, which is a much better check than squinting at a screenshot. Colour 0 is the page,
 7 is text, 2 is the cursor.
 
-### The type-ahead bug (serial console)
+### The one-byte corruption, and the type-ahead bug: both fixed, and both were the same bug
 
-**Still open, and still on the serial line only** - the graphics console keyboard is a different path
-and does not show it. Worth re-testing now that the keyboard work is in, because "loses or duplicates
-its first character" is the same shape as the swallowed-first-keystroke bug that turned out to be the
-keyboard ID handshake, and nobody has checked whether the serial one has a similarly boring cause.
+**`Memory::Read16`/`Read32`/`Write16`/`Write32` threw the low address bits away.** They indexed a 16
+or 32 bit view of the RAM array with `addr >> 1` / `addr >> 2`, so a word access at an odd address,
+or a long access at anything that was not a multiple of four, silently landed at `addr & ~1` or
+`addr & ~3`. **A 68020 permits misaligned word and long operands** - unlike the 68000 and 68010,
+which take an address error - and splits them into as many bus cycles as it needs, so IRIX's compiler
+happily emits `move.l (a0)+,(a1)+` over a buffer that is not four byte aligned. Every one of those
+read or wrote up to three bytes early.
 
-A line typed while a command is still running loses or duplicates its first character, so `cat` runs
-as `at` and `echo` as `eecho`. Spacing input out (two `\p9` chunks, ~18s) avoids it entirely, which is
-why every scripted test here does that. Known:
+The result was data shifted by exactly `addr & 3` bytes, and it looked random because it depends only
+on where the buffer happened to sit. Everything below was one bug:
 
-* The DUART is **not** dropping it. Zero FIFO overruns, and the tty *echo* of the mangled line is
-  always byte-correct, so the kernel received every character and the loss is between the tty buffer
-  and the shell's `read()`.
-* It is not `copyout`/`sustring`. Both lock the user pages and copy through a kernel scratch mapping
-  (`iolock` + the map window at `0x3b00dfd0` + `_vmmap+0x2000`), so no user page fault can happen
-  mid-copy. argv and freshly `setenv`'d variables survive exec byte-for-byte.
+* `tset -s -Q` printing `setenv TERM |wsiri ;` instead of `wsiris ;`, which is why `/.login` and
+  `/.profile` reported `setenv: Too few arguments`, `wsiri: Command not found` and a line of raw
+  termcap. Its name pointer landed one past a four byte boundary, so every long the copy read came
+  from one byte lower - dragging in the `|` that precedes the name in `S1|wsiris|iris40` and dropping
+  the trailing `s`. `write(fd, "set noglob;\n", 12)` produced `\0set noglob;` for the same reason.
+* `TZ` coming out as `TPST8PDT`, and shell scripts failing on it.
+* `telinit` arriving as `elinit` - a misaligned *write* shifts the other way, so the leading byte
+  lands one before the buffer and is lost.
+* **The type-ahead bug.** A line typed while a command was still running lost or duplicated its first
+  character (`cat` ran as `at`, `echo` as `eecho`). It was never the DUART and never the tty - it was
+  the copy of the line into the user's buffer. Verified fixed: `sum -r /bin/csh` with two more lines
+  sent immediately behind it, no pauses, all three echo and execute exactly.
 
-`tset -s -Q` also prints `setenv TERM |wsiri ;` instead of `wsiris ;` and loses the opening quote of
-`setenv TERMCAP '`, which is why `/.login` and `/.profile` both report `setenv: Too few arguments`.
-It looks like the same one-character class of bug, but the disk is **GL2-W3.6** (see `/Versions`)
-while the source tree is 3.7, so `bin/tset/tset.c` is one minor version ahead of the binary.
+Every access is assembled a byte at a time now, big endian, at the address it was given; gcc folds
+that back into one unaligned load and a bswap, so it is not slower. `PROM`, `PROM_SRAM` and `BP3` had
+the same indexing and are fixed the same way - BP3 with `memcpy`, because VRAM is host order pixels
+rather than a big endian byte array, so aligned accesses had to stay bit-identical.
+`PROM_SRAM::Read32` had a second bug on top: it byte swapped into a `uint16_t`, truncating, and then
+returned the *unswapped* value anyway.
 
-**Do not assume a silent boot means a hang.** `SerialLine` only writes a log line on newline, so a
-prompt with no trailing newline (`# `, `login:`) never appears in `motion.log` at all.
+**How it was found, which is the reusable part.** The symptom looked like a disk problem, so the
+first thing was to rule the disk out rather than argue about it: `sum -r` (order sensitive, unlike
+plain `sum`) on four files including 107KB of `/bin/csh`, in the guest, against `scratch/sysvsum.py`
+on the host reading the same files out of the image. Exact, twice, so nothing between the platter and
+`read()` was touching the data. The same command showed `cat /bin/csh | sum -r` exact, so pipes were
+clean, and 24 lines of 62 characters through the serial console arrived perfect, so output was clean.
+That left the process's own memory - and `tset -s -Q` writing byte-identical output on two
+consecutive runs said it was deterministic, not a race. Dumping the bytes it actually produced
+(`tset -s -Q > /tmp/t1`, then pull `/tmp/t1` out of the image with `efs.py`) gave a payload shifted by
+exactly one byte, which is what named the bug.
+
+**Two related things that are still open.** `AddrSpace` translates only the *first* address of a
+sized access and hands the whole operand to one component, so a misaligned word or long that straddles
+a page boundary is resolved entirely in the first page - a real 68020 splits it into separate bus
+cycles and translates each. Rare, but wrong. And an access that straddles the boundary between two
+*components* goes wholly to the first one.
 
 ## What is *not* wrong (checked, so don't re-chase it)
 
 * **The DUART does not drop received characters.** It looked that way for a while. Some of it was the
-  `AddrSpace` race above; the rest was misreading init, which re-prompts `ENTER RUN LEVEL` after
-  every line including a successful one, so later input reads as `Usage: 0123456sS` and looks lost.
-  With the race fixed, `2\n` and `s\n` land 3 runs out of 3, and a `\p`-separated conversation
-  delivers every chunk exactly as sent.
+  `AddrSpace` race above, some was the misaligned access bug above, and the rest was misreading init,
+  which re-prompts `ENTER RUN LEVEL` after every line including a successful one, so later input
+  reads as `Usage: 0123456sS` and looks lost.
 * **Instruction restart after a page fault.** `-(An)`, `push`, `movem`, `jsr` and `move (An)+,(Am)+`
   are all restartable now. If another one-byte-off symptom turns up, this is still the first family
   to suspect — the test is whether the instruction commits anything before its *last* memory access.
@@ -588,7 +610,14 @@ prompt with no trailing newline (`# `, `login:`) never appears in `motion.log` a
   what it actually was.
 * **exec's argv/envp block.** argv arrives byte-for-byte correct, and a variable `setenv`'d in csh
   reaches the child intact. `sustring` and `copyout` never fault mid-copy — they `iolock` the user
-  pages and copy through a kernel scratch mapping.
+  pages and copy through a kernel scratch mapping. (The `OME=/` for `HOME=/` that used to show here
+  was the `move (An)+,(Am)+` restart bug; the *other* one-byte symptoms were the misaligned access
+  bug above.)
+* **The disk read path does not drop bytes.** Checked properly, because it looked like it did:
+  `sum -r` in the guest against `scratch/sysvsum.py` on the host, over `/etc/rc`, `/bin/tset`,
+  `/etc/TZ` and 107KB of `/bin/csh`, matches exactly - twice per boot and through a pipe. Both
+  controllers. If a one-byte symptom ever comes back, run that first and rule the disk out in one
+  command rather than reasoning about it.
 * **Pipes and backquote substitution.** `echo ABCDEFGHIJ | cat` and ``echo `cat /etc/TZ` `` are both
   exact.
 
@@ -653,9 +682,10 @@ the console about 8 seconds in. There is no run level prompt to answer any more.
 ```
 
 14 seconds is about right on this machine — earlier and the console is not open yet and the input is
-swallowed. **Space commands out with `\p9\p9` (18s), not `\p5`.** A line that lands while the
-previous command is still running loses or duplicates its first character (see above), which reads as
-a guest bug and is not one you are looking for.
+swallowed. **Spacing commands out with `\p9\p9` is no longer necessary**: a line that landed while the
+previous command was still running used to lose or duplicate its first character, and that was the
+misaligned memory access bug, now fixed. Chaining several commands on one line with `;` is still the
+cheapest way to drive a test, because it costs one prompt instead of one wait per command.
 
 `SerialLine` logs on newline, so the prompt and the tty echo of your line share one log line
 (`# echo hi`) and the command's output is the next one. Output and the echo of the *next* line can

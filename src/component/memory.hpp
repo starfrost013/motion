@@ -47,7 +47,8 @@ namespace Motion
         size_t GetRamCapacity() { return Emulation::GetMachine()->totalRamInstalled; };
 
         /// @brief True if addr is backed by fitted RAM. Logs, rate limited, when it is not.
-        bool IsInRange(size_t addr, const char* what);
+        /// @brief Does a `width` byte operand at `addr` fit inside the RAM fitted?
+        bool IsInRange(size_t addr, size_t width, const char* what);
 
         int32_t outOfRangeLogged = 0;
 

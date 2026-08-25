@@ -89,14 +89,20 @@ namespace Motion
         return vram[addr];
     }
 
+    /*
+        VRAM is host order 32 bit pixels rather than a big endian byte array - the dumps and DC4 both
+        read it that way - so unlike memory.cpp these stay in host order. What does change is the
+        indexing: addr >> 1 / addr >> 2 threw the low address bits away, so a misaligned access, which
+        a 68020 is allowed to make, silently aliased onto a lower pixel. memcpy reads the bytes that
+        were actually asked for and is identical to the old code whenever the address was aligned.
+    */
     uint16_t BP3::Read16(size_t addr) 
     {
         if (!InRange(addr, sizeof(uint16_t)))
             return 0;
 
-        uint16_t* vram16 = (uint16_t*)vram; // shutup compiler
-        uint16_t value = vram16[addr >> 1];
-        //TOBE16(value); // TODO: FIX THIS TERRIBLE SYNTAX
+        uint16_t value = 0;
+        memcpy(&value, vram + addr, sizeof(value));
         return value;
     }
 
@@ -105,9 +111,8 @@ namespace Motion
         if (!InRange(addr, sizeof(uint32_t)))
             return 0;
 
-        uint32_t* vram32 = (uint32_t*)vram; // shutup compiler
-        uint32_t value = vram32[addr >> 2];        
-        //TOBE32(value);
+        uint32_t value = 0;
+        memcpy(&value, vram + addr, sizeof(value));
         return value;
     }
 
@@ -124,11 +129,11 @@ namespace Motion
         if (!InRange(addr, sizeof(uint16_t)))
             return;
 
-        uint16_t* vram16 = (uint16_t*)vram;
-        //TOBE16(value);
         // A word index is the byte address halved, not quartered - >> 2 put every 16 bit write at
         // half the offset it was meant for, which is the same address two different pixels share.
-        vram16[addr >> 1] = value & writeMask;
+        // It is a memcpy now so that a misaligned address lands where it was asked to; see Read16.
+        uint16_t masked = (uint16_t)(value & writeMask);
+        memcpy(vram + addr, &masked, sizeof(masked));
     }
     
     void BP3::Write32(size_t addr, uint32_t value)
@@ -136,9 +141,8 @@ namespace Motion
         if (!InRange(addr, sizeof(uint32_t)))
             return;
 
-        uint32_t* vram32 = (uint32_t*)vram;
-        //TOBE32(value);
-        vram32[addr >> 2] = value & writeMask;
+        uint32_t masked = value & writeMask;
+        memcpy(vram + addr, &masked, sizeof(masked));
     }
 
     /// @brief get a vram address

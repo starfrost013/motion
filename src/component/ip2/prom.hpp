@@ -30,22 +30,21 @@ namespace Motion
             return (rom[addr]); 
         };
 
+        /*
+            Byte at a time, big endian, at the address given. Indexing a 16 or 32 bit view with
+            addr >> 1 / addr >> 2 discarded the low address bits, and a 68020 is allowed to make a
+            misaligned word or long access - see the note in memory.cpp, which had the same bug where
+            it mattered far more.
+        */
         uint16_t Read16(size_t addr) override 
         { 
             addr %= (size_t)promSize->GetValue();
-            uint16_t* rom16 = (uint16_t*)rom; 
-            uint16_t value =  rom16[addr >> 1]; 
-            TOBE16(value);
-            return value;
+            return (uint16_t)(((uint16_t)rom[addr] << 8) | rom[(addr + 1) % (size_t)promSize->GetValue()]);
         };
 
         uint32_t Read32(size_t addr) override 
         { 
-            addr %= (size_t)promSize->GetValue();
-            uint32_t* rom32 = (uint32_t*)rom; 
-            uint32_t value = rom32[addr >> 2]; 
-            TOBE32(value);
-            return value;
+            return ((uint32_t)Read16(addr) << 16) | Read16(addr + 2);
         };
 
         void Write8(size_t addr, uint8_t value) override
