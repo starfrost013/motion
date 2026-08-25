@@ -12,6 +12,8 @@ We're working on `motion`, an SGI IRIS 3130 emulator at `/home/dani/repos/motion
 `resume-prompt.md` for the general state; **this document is what changed in the multi-user session
 and what is worth doing next.**
 
+Every path in this document is relative to the repo root, not to `ai-docs/`.
+
 `CLAUDE.md` bars AI-generated code from *upstream*, which means **never push**. Local commits on
 `ai-main2` are fine and expected, with a `Co-Authored-By: Claude` trailer. Scratch files go in
 `scratch/` inside the repo (gitignored), not `/tmp`.
@@ -202,6 +204,20 @@ or nothing at all.
 * **GF2 geometry** — no clipping, no z-buffer, and `FBCmasklist` does nothing so drawing is not
   clipped to a window. The demos in `/usr/people/demos` (`airshow`, `jet`, `flight`, `cube`, `arch`)
   will draw *something* and be wrong in interesting ways. `+set logGF2 1` decodes the command stream.
+* **An intermittent kernel panic, ~1 boot in 3.** Seen once at a multi-user login shell running
+  `who`, and not reproduced by running the identical command twice more, so it is not that command:
+
+  ```
+  kernel trap: type=2 pc=0 ps=2000 aaddr=0
+  panic: trap(print)
+  ```
+
+  `pc=0` in supervisor mode means the kernel branched to address zero and bus errored fetching there
+  - a wild or null function pointer. The first suspect is the page-crossing gap immediately below,
+  because that is the one known way a kernel structure can be read wrong without anything else
+  noticing. `+set logCpuTrace 1` prints the last 48 retired PCs and the control-flow edge list, which
+  is what identified the `jsr` restart bug and is the right tool here too.
+
 * **`AddrSpace` splits nothing.** A misaligned word or long that straddles a page boundary is
   translated for its first page only and handed whole to one component; a real 68020 splits it into
   separate bus cycles and translates each. Rare, but wrong. Same for an access straddling two

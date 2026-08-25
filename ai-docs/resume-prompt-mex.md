@@ -10,6 +10,8 @@ this one assumes it. This one is only about the window manager.
 We're working on `motion`, an SGI IRIS 3130 emulator at `/home/dani/repos/motion`. Read
 `resume-prompt.md` for the general state of the project.
 
+Every path in this document is relative to the repo root, not to `ai-docs/`.
+
 **`mex`, the GL2 window manager, runs, the mouse works and there is a pointer on the screen.** mex starts from the graphics console,
 completes its GL2 startup, draws a bordered window with a red `console` title bar and the textport
 inside it, and goes to sleep on `_inchan` waiting for input. `scratch/mexshot.png` is what that looks

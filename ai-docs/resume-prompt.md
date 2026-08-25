@@ -7,6 +7,8 @@ Paste the section below into a new session. Everything after the horizontal rule
 We're working on `motion`, an SGI IRIS 3130 emulator at `/home/dani/repos/motion`. Continue from where
 the last session stopped.
 
+Every path in this document is relative to the repo root, not to `ai-docs/`.
+
 `CLAUDE.md` bars AI-generated code from the repository, and that means **never push**. The owner does
 want the code written, and commits on the local `ai-main2` branch are fine and expected - they are
 what makes rebasing onto upstream possible at all. Every commit gets a `Co-Authored-By: Claude`
@@ -913,7 +915,7 @@ probes are "does this access bus error", so an over-wide decode invents hardware
   address/control logic, and a 2MB board photo you can read part numbers off. IP2 sheet index: 8 MOUSE/PARITY,
   14 MAP.ADDRESS.GENERATION, 15 PROCESSOR.MAP, 16 PROTECTION/LIMIT, 18 MULTIBUS.MAP.AND.CONTROL.
 * DSD 5217 manuals on bitsavers under `pdf/dsd/5215_5217/`.
-* `dsd5217-analysis.md` in the repo root. Note its §2.3 (paragraph masking) is superseded — the CIB
+* `../dsd5217-analysis.md` in the repo root. Note its §2.3 (paragraph masking) is superseded — the CIB
   pointer names the CIB's byte 4, see `DSD5217_CIB_PTR_BIAS`.
 
 ## Known gaps

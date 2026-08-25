@@ -10,6 +10,8 @@ this one assumes it. This one is only about storage.
 We're working on `motion`, an SGI IRIS 3130 emulator at `/home/dani/repos/motion`. Read
 `resume-prompt.md` for the general state of the project; **this task is the disk subsystem.**
 
+Every path in this document is relative to the repo root, not to `ai-docs/`.
+
 `CLAUDE.md` bars AI-generated code from *upstream*, which means **never push**. Local commits on
 `ai-main2` are fine and expected, with a `Co-Authored-By: Claude` trailer. Scratch files go in
 `scratch/` inside the repo (gitignored), not `/tmp`.
