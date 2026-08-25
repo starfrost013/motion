@@ -44,27 +44,34 @@ Run it:
 ```bash
 cd scratch/runsii
 ./motion +set skipLauncher 1 +set startPaused 0 \
-         +set profileDisk1Path 3130-si0.img +set bootDevice sd +set enableDSD 0 \
+         +set diskController storager +set profileDisk0Path 3130-si0.img \
          +set diskWriteMode overlay
 ```
+
+`bootDevice` works itself out - it defaults to the disk of whichever controller is fitted, so a
+Storager machine loads its kernel from `sd.0` without being told to.
 
 `diskWriteMode overlay` is copy on write: the image is opened read-only and guest writes are held in
 memory, so it does not matter how you stop the emulator. Drop it when you want the writes kept, or
 keep it and add `+set diskCommitOnExit 1` for the one boot where you do.
 
 **The DSD 5217 is unchanged and still the default.** With no arguments the machine is the 3115 it
-always was — `root on md0a`, the Storager probes alive with no drive attached and says
-`si0 not installed`. These cvars change that, all new:
+always was — `root on md0a`. These cvars change that:
 
 | cvar | default | what it does |
 | --- | --- | --- |
-| `enableStorager` | 1 | Fit the Storager board. The board is harmless with no disk. |
-| `profileDisk1Path` | `3130_2.img` | The image on `si0`. Does not exist by default, so no drive. |
-| `enableDSD` | 1 | Fit the DSD 5217. `0` gives a machine with no `md0` at all. |
-| `bootDevice` | `md` | Which device the **PROM** loads the kernel from. `sd` is the Storager. |
+| `diskController` | `dsd` | **Which disk controller is fitted**: `dsd`, `storager` or `none`. A machine has one, and which one decides what the machine is. |
+| `profileDisk0Path` | `3130.img` | The **first physical drive** - `md0` on the DSD, `si0` on the Storager. |
+| `profileDisk1Path` | `3130_2.img` | The **second physical drive** - `md1` / `si1`. Does not exist by default, so that bay is empty. |
+| `bootDevice` | follows `diskController` | Which device the **PROM** loads the kernel from. `md` for the DSD, `sd` for the Storager; setting it explicitly wins. |
 | `logStorager` | 0 | One line per command the Storager executes. |
 | `diskWriteMode` | `direct` | `overlay` is copy on write - see below. `readonly` refuses writes. |
 | `diskCommitOnExit` | 0 | With `overlay`, write what the guest did back into the image on shutdown. |
+
+**One controller at a time, and it brings its own floppy and tape.** Both of these boards are
+combined disk/floppy/tape controllers - the DSD carries `mf0` and `qic0`, the Storager carries `sf0`
+and `siq0` - which is why this is one string rather than an enable flag per board. The two drive
+paths are the machine's two physical drives on whichever board that is.
 
 ## What the Storager is, and where the emulation lives
 
@@ -186,11 +193,10 @@ unswapped image (`img[0::2], img[1::2] = raw[1::2], raw[0::2]`).
 `setroot()` in `sys/ipII/autoconf.c` picks root from the label's `d_bootfs`/`d_rootfs` and never
 looks at `d_controller`, so once the Storager attaches, root lands on `si0a` by itself.
 
-**One wrinkle worth knowing.** With both controllers fitted and both disks labelled, root moves to
-si0a — `sii` attaches after `dsd` and the last one to match wins — but **swap stays on md0b**, because
-`setroot()` only replaces the swap partition it has if the new one is strictly *larger*, and the two
-are the same size. `+set enableDSD 0` is the clean answer, and it is also the honest configuration: a
-real 3130 had no DSD.
+**A wrinkle that used to bite and no longer can.** While both controllers could be fitted at once,
+root moved to si0a — `sii` attaches after `dsd` and the last one to match wins — but **swap stayed on
+md0b**, because `setroot()` only replaces the swap partition it has if the new one is strictly
+*larger*, and the two were the same size. One controller at a time makes that unreachable.
 
 ## What is left
 
@@ -201,8 +207,6 @@ Nothing blocks a working disk. In rough order of how much each one buys:
   `siq0 at mbio 0x73fc ipl 5` line is missing. `sys/multibus/siq.c` and `siqreg.h` are the driver;
   the floppy is `sifattach()`/`sifstrategy()` in `sii.c` and `sii_mits_uib` in `siiuib.h`. Doing the
   tape means widening the decode to the whole 512 bytes and implementing R4-R7.
-* **`si1`.** Unit 1 exists in the config and in `MAX_WINNYS`, but there is no cvar for a second
-  Storager image so it always reports not installed. One more disk path and one line in `Start()`.
 * **Formatting.** `C_FORMAT`, `C_MAP` and `C_REFORMAT` return "invalid command code", so a disk
   cannot be built from scratch on the emulated board — which is what `mkboot` and `stand/cmd/sifex/`
   do. Nothing needs it while a labelled image exists, but it is the difference between running a disk

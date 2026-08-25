@@ -302,6 +302,18 @@ namespace Motion
             uint8_t sb[DSD5217_SB_SIZE];        // the status buffer ?
         }; 
 
+        /*
+            One physical drive. The controller supports two winchesters and the IOPB names which one
+            every command is for, so the geometry an Initialize sets belongs to the drive rather than
+            to the board - two drives of different shapes would otherwise overwrite each other's.
+        */
+        struct Drive
+        {
+            DiskImage* image = nullptr;
+            INIB inib = {0};
+            bool initialised = false;
+        };
+
         uint8_t state;                          // last byte written to the programmed i/o port
 
         // Methods
@@ -313,8 +325,15 @@ namespace Motion
     private: 
         // Multibus IRQ1 is used.
         Multibus* multibus = nullptr;
-        DiskImage* hdd = nullptr;
+        Drive drives[DSD5217_MAX_DISK_DRIVES];
         CoherentExtensionDSD5217* dsdExtension = nullptr;
+
+        /// @brief The drive the IOPB in hand is addressed to, or nullptr if that unit is not fitted.
+        Drive* CurrentDrive();
+
+        /// @brief Set from CurrentDrive() when a command is fetched, so the helpers below do not all
+        ///        have to be handed it.
+        Drive* currentDrive = nullptr;
 
         WUB wub = {0};
         CCB ccb = {0};
@@ -355,9 +374,6 @@ namespace Motion
         bool WriteSector();
         bool ReadInitBlock();
         bool WriteStatusBlock();
-
-        // can't do any disk ops if there is no disk inserted lmao
-        bool diskIsOpen;
 
         // The controller comes up held in reset. The first start command after the reset is removed only
         // chains through the tables - it does not execute an IOPB. (5215 User Guide, 4.5 step C)

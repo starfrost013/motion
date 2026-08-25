@@ -1,4 +1,5 @@
-#include <component/ip2/ip2_dip_switches.hpp>   
+#include <component/ip2/ip2_dip_switches.hpp>
+#include <base/profile/profile.hpp>   
 
 namespace Motion
 {
@@ -53,7 +54,13 @@ namespace Motion
         // PROM tried to boot from was down to whatever happened to be in the heap that day.
         switchState = (SWITCH_AUTOBOOT | SWITCH_BOOT_DEVICE_MD);
 
-        bootDevice = Cvar::Get("bootDevice", "md");
+        /*
+            Default to the disk of whichever controller is fitted, because a machine that cannot find
+            its own boot device is a confusing thing to hand somebody. An explicit +set bootDevice
+            still wins - Cvar::Get returns the existing convar and ignores the default.
+        */
+        bootDevice = Cvar::Get("bootDevice",
+            (Profile::GetDiskController() == DiskControllerType::Storager) ? "sd" : "md");
 
         for (const BootDeviceName& entry : bootDeviceNames)
         {

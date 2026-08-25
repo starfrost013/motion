@@ -218,7 +218,6 @@ namespace Motion
     // How many status reads the reset self test appears to take. See ResetController().
     #define STORAGER2_RESET_SETTLE_READS        4
 
-    extern Cvar* enableStorager;
     extern Cvar* logStorager;
 
     class Storager2 : public Component

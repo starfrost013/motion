@@ -21,18 +21,17 @@
 
 namespace Motion
 {
-    Cvar* enableStorager;
     Cvar* logStorager;
 
     void Storager2::Start()
     {
-        enableStorager = Cvar::Get("enableStorager", "1");
         logStorager = Cvar::Get("logStorager", "0");
         logEnabled = (logStorager->GetValue() != 0);
 
-        if (!enableStorager->GetValue())
+        if (Profile::GetDiskController() != DiskControllerType::Storager)
         {
-            Logger::Log(STORAGER2_LOG_PREFIX, "Storager 2 is not fitted. +set enableStorager 1 to fit the board.");
+            Logger::Log(STORAGER2_LOG_PREFIX, "Storager 2 is not the fitted disk controller. "
+                "+set diskController storager fits it.");
             return;
         }
 
@@ -47,26 +46,26 @@ namespace Motion
         multibus->AddSlotMapping(slot);
 
         /*
-            si0 is disk 1 in the profile, because disk 0 is the DSD's md0 and both boards are fitted.
-            profileDisk1Path defaults to a file that does not exist, so out of the box the controller
-            probes alive with nothing attached to it and the machine still boots off md0 - which is
-            what a real 3130 with an empty drive bay would do. Point profileDisk1Path at a disk
-            labelled DC_STORAGER and root moves to si0a.
+            si0 and si1, the machine's two physical drives - profileDisk0Path and profileDisk1Path.
+            The controller also carries a floppy on unit 2 and a QIC tape as siq0, neither of which is
+            emulated, so those units stay empty and report not installed.
         */
-        drives[0].image = Profile::OpenDisk(1);
-
-        if (drives[0].image)
+        for (int32_t i = 0; i < STORAGER2_MAX_WINCHESTERS; i++)
         {
-            drives[0].imageSize = drives[0].image->GetSize();
+            drives[i].image = Profile::OpenDisk(i);
 
-            Logger::Log(STORAGER2_LOG_PREFIX, std::format("si0: {} byte image ({} blocks of {})",
-                drives[0].imageSize, drives[0].imageSize / STORAGER2_BLOCK_SIZE, STORAGER2_BLOCK_SIZE).c_str());
+            if (!drives[i].image)
+                continue;
+
+            drives[i].imageSize = drives[i].image->GetSize();
+
+            Logger::Log(STORAGER2_LOG_PREFIX, std::format("si{}: {} byte image ({} blocks of {})",
+                i, drives[i].imageSize, drives[i].imageSize / STORAGER2_BLOCK_SIZE, STORAGER2_BLOCK_SIZE).c_str());
         }
-        else
-        {
-            Logger::Log(STORAGER2_LOG_PREFIX, "Storager 2 fitted with no drive - si0 will report not installed. "
-                "Set profileDisk1Path to a disk image labelled DC_STORAGER to attach one.");
-        }
+
+        if (!drives[0].image)
+            Logger::Log(STORAGER2_LOG_PREFIX, "Storager 2 fitted with no drive on unit 0 - si0 will report not "
+                "installed. Point profileDisk0Path at a disk image to attach one.");
 
         Logger::Log(STORAGER2_LOG_PREFIX, std::format("Storager 2 fitted: registers at 0x{:x}, Multibus IRQ {}.",
             STORAGER2_MBIO_START & 0xFFFF, STORAGER2_MULTIBUS_IRQ_LEVEL).c_str());

@@ -26,6 +26,7 @@ namespace Motion
     extern Cvar* profileDisk1Path; // for future expansion
     extern Cvar* diskWriteMode;
     extern Cvar* diskCommitOnExit;
+    extern Cvar* diskController;
 
     extern Cvar* ramInstalled;
     extern Cvar* numBitplanes;
@@ -37,6 +38,20 @@ namespace Motion
     extern Cvar* skipLauncher;
     
     #define PROFILE_LOG_PREFIX      "Profile"
+
+    /*
+        Which disk controller is fitted. A machine has one - the DSD 5217 makes it a 3115 and the
+        Interphase Storager makes it a 3130, and the two are alternatives rather than a pair, which is
+        why this is one string rather than an enable flag per board. profileDisk0Path and
+        profileDisk1Path are then the two physical drives hanging off whichever one it is: md0/md1 on
+        the DSD, si0/si1 on the Storager.
+    */
+    enum class DiskControllerType
+    {
+        None,
+        DSD5217,
+        Storager,
+    };
 
     // Base Configuration cvars
 
@@ -68,6 +83,11 @@ namespace Motion
         /// @brief Close a disk, committing its overlay first if +set diskCommitOnExit says so.
         ///        YOU MUST SET TO NULLPTR, your image is DEAD.
         static void CloseDisk(DiskImage* image);
+
+        /// @brief Which disk controller +set diskController asks for. Warns once if it is nonsense.
+        static DiskControllerType GetDiskController();
+
+        static const char* DiskControllerName(DiskControllerType type);
         
         /// @brief this method does the same thing as Filesystem::Close. YOU MUST SET TO NULLPTR, your stream is DEAD
         static void Close(FileStream* fs);

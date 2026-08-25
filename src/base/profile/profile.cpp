@@ -18,6 +18,7 @@ namespace Motion
     Cvar* profileDisk1Path; 
     Cvar* diskWriteMode;
     Cvar* diskCommitOnExit;
+    Cvar* diskController;
 
     void Profile::Init()
     {
@@ -50,6 +51,46 @@ namespace Motion
         else
             return Filesystem::Open(path, mode);
 
+    }
+
+    DiskControllerType Profile::GetDiskController()
+    {
+        const char* wanted = diskController->GetString();
+
+        if (!strcmp(wanted, "dsd") || !strcmp(wanted, "dsd5217"))
+            return DiskControllerType::DSD5217;
+
+        if (!strcmp(wanted, "storager") || !strcmp(wanted, "sii"))
+            return DiskControllerType::Storager;
+
+        if (!strcmp(wanted, "none"))
+            return DiskControllerType::None;
+
+        // Both controllers ask, so only complain the first time.
+        static bool complained = false;
+
+        if (!complained)
+        {
+            complained = true;
+
+            Logger::Log(PROFILE_LOG_PREFIX, std::format("diskController \"{}\" is not one of dsd, storager or none - "
+                "fitting the DSD 5217", wanted).c_str(), LogChannels::Warning);
+        }
+
+        return DiskControllerType::DSD5217;
+    }
+
+    const char* Profile::DiskControllerName(DiskControllerType type)
+    {
+        switch (type)
+        {
+        case DiskControllerType::DSD5217:
+            return "DSD 5217";
+        case DiskControllerType::Storager:
+            return "Interphase Storager";
+        default:
+            return "none";
+        }
     }
 
     DiskImage* Profile::OpenDisk(int32_t id)
@@ -87,7 +128,15 @@ namespace Motion
 
         if (!image)
         {
-            Logger::Log(PROFILE_LOG_PREFIX, std::format("Failed to open HDD {} at {}!", id, hddPath).c_str(), LogChannels::Error);
+            // An empty drive bay is the normal case for the second drive, so only shout about an
+            // image that is there and will not open.
+            bool exists = std::filesystem::exists(resolved);
+
+            Logger::Log(PROFILE_LOG_PREFIX, std::format("HDD {}: {}", id, exists
+                ? std::format("{} exists but could not be opened", hddPath)
+                : std::format("no {} - that drive bay is empty", hddPath)).c_str(),
+                exists ? LogChannels::Error : LogChannels::Message);
+
             return nullptr; 
         }
 

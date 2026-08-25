@@ -657,10 +657,9 @@ cd build/output/RelWithDebInfo && DISPLAY=:1 ./motion +set skipLauncher 1 +set s
 | `+set gf2RetraceHz 60` | The GF2 vertical retrace rate, on Multibus IRQ 3. **0 turns the interrupt off**, which is the quickest way to separate a fault in the retrace path from one behind it. |
 | `+set logMouse 1` | Every host movement with the backlog it joined, every fiftieth tick the guest acknowledges, and every cursor draw and undraw with the glyph's sixteen words. Cheap - unlike `logGF2`, it does not slow the machine down. |
 | `+set logKeyboard 1` | Every make and break code the emulated keyboard sends, with its scancode. |
-| `+set enableStorager 1` | Fit the Interphase Storager (`sii0`). **On by default** - a real 3130 has one, and with no image attached it costs three lines in the probe list and nothing else. |
-| `+set profileDisk1Path 3130-si0.img` | The disk image on `si0`. Defaults to a name that does not exist, so no drive is attached. |
-| `+set enableDSD 0` | Leave the DSD 5217 out. Needed for a *pure* 3130 - with both fitted, root moves to si0a but swap stays on md0b, because `setroot()` only takes a strictly larger swap partition than the one it already has. |
-| `+set bootDevice sd` | Which device the **PROM** loads the kernel from, by name: `md` (default, DSD disk), `sd` (Storager disk), `mf`/`sf` floppies, `mt`/`st` tapes, `ip`, `xns`, `prom`, `eprom`. Previously hardcoded to md. |
+| `+set diskController storager` | **Which disk controller is fitted**: `dsd` (default), `storager` or `none`. A machine has one, and which one decides what the machine is - the DSD makes it a 3115, the Storager a 3130. Both boards are combined disk/floppy/tape controllers, so the board brings its floppy and tape with it. |
+| `+set profileDisk0Path 3130-si0.img` | The machine's **first physical drive** - `md0` on the DSD, `si0` on the Storager. `profileDisk1Path` is the second (`md1`/`si1`), and defaults to a name that does not exist, so that bay is empty. |
+| `+set bootDevice sd` | Which device the **PROM** loads the kernel from, by name: `md` (DSD disk), `sd` (Storager disk), `mf`/`sf` floppies, `mt`/`st` tapes, `ip`, `xns`, `prom`, `eprom`. Defaults to the disk of whichever controller is fitted; setting it explicitly wins. |
 | `+set logStorager 1` | One line per command the Storager executes, with its CHS, its Multibus buffer and its length. |
 | `+set diskWriteMode overlay` | **Copy on write.** The image is opened read-only and guest writes are kept in memory, so it does not matter how the emulator stops and two of them on one image stop being dangerous. `direct` (the default) writes straight through as it always did; `readonly` refuses writes and the guest gets `hard error: bus timeout error`. |
 | `+set diskCommitOnExit 1` | With `overlay`, fold what the guest wrote back into the image on shutdown. The one way an overlay survives the process - for the boot where you meant it, like an `/etc/fsck` repair you want to keep. |
@@ -925,7 +924,7 @@ and only `3030|3120B|3130` to `si0a`/`si0f`. `scratch/runsii` runs it:
 ```bash
 cd scratch/runsii
 ./motion +set skipLauncher 1 +set startPaused 0 \
-         +set profileDisk1Path 3130-si0.img +set bootDevice sd +set enableDSD 0 \
+         +set diskController storager +set profileDisk0Path 3130-si0.img \
          +set diskWriteMode overlay
 ```
 

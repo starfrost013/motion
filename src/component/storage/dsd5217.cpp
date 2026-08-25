@@ -23,23 +23,11 @@
 
 namespace Motion
 {
-    Cvar* enableDSD;
-
     void DSD5217::Start()
     {
-        /*
-            Fitted by default, because this is the controller the shipped disk image is labelled for
-            and the one the boot switch points at. Turning it off is what makes a *pure* 3130
-            possible: with a Storager fitted instead (+set bootDevice sd) the machine has no DSD at
-            all, which is the configuration a real 3130 shipped in - and it is the only way swap ends
-            up on si0b, because setroot() keeps the first swap partition it finds of a given size and
-            md0 is probed first.
-        */
-        enableDSD = Cvar::Get("enableDSD", "1");
-
-        if (!enableDSD->GetValue())
+        if (Profile::GetDiskController() != DiskControllerType::DSD5217)
         {
-            Logger::Log(DSD5217_LOG_PREFIX, "DSD 5217 is not fitted. +set enableDSD 1 to fit the board.");
+            Logger::Log(DSD5217_LOG_PREFIX, "DSD 5217 is not the fitted disk controller. +set diskController dsd fits it.");
             return;
         }
 
@@ -59,9 +47,13 @@ namespace Motion
 
         multibus->AddSlotMapping(slot);
 
-        // open the hard drive
-        hdd = Profile::OpenDisk(0);
-        diskIsOpen = (hdd != nullptr);
+        /*
+            The two winchesters the controller supports, md0 and md1. They are the machine's two
+            physical drives - profileDisk0Path and profileDisk1Path - not two controllers; the IOPB
+            says which one every command is for.
+        */
+        for (int32_t i = 0; i < DSD5217_MAX_DISK_DRIVES; i++)
+            drives[i].image = Profile::OpenDisk(i);
 
         dsdExtension = new CoherentExtensionDSD5217(this);
         Coherent::RegisterExtension(dsdExtension);
@@ -227,8 +219,10 @@ namespace Motion
 
     void DSD5217::Write8(size_t addr, uint8_t value)
     {
-        // don't bother if no hdd
-        if (!hdd)
+        // With no drive fitted at all the board does not answer its port, which is what it did
+        // before there was more than one drive and is what makes dsd0 probe as absent.
+        if (!drives[0].image
+        && !drives[1].image)
             return;
 
         addr &= 0xFFFFF;
@@ -302,7 +296,8 @@ namespace Motion
     void DSD5217::ExecuteCommand()
     {
         // we only emualte the hard drive right now
-        if (!hdd)
+        if (!drives[0].image
+        && !drives[1].image)
             return; 
 
         SetControllerBusy(true);
@@ -318,10 +313,25 @@ namespace Motion
 
         FetchIOPB();
 
+        // Which of the two winchesters this command is for. Everything below works through it.
+        currentDrive = CurrentDrive();
+
         bool commandIsImplemented = true;
         bool ok = true;
 
-        if (iopb.deviceCode != DSD5217_DEVICE_CODE_HDD)
+        if (iopb.deviceCode == DSD5217_DEVICE_CODE_HDD
+        && !currentDrive)
+        {
+            /*
+                A command for a drive that is not fitted. Reporting "unit not ready" rather than
+                quietly succeeding is what makes md1 come out as "not installed" instead of attaching
+                as a second copy of md0, which is what happened while every command went to drive 0
+                whatever the IOPB said.
+            */
+            inist.sb[DSD5217_SB_HARD_ERROR1] |= DSD5217_HARDERR1_UNIT_NOT_READY;
+            ok = false;
+        }
+        else if (iopb.deviceCode != DSD5217_DEVICE_CODE_HDD)
         {
             Logger::Log(DSD5217_LOG_PREFIX, "Only HDD commands are currently supported! (QIC, Floppy not implemented!)", LogChannels::Warning);
             commandIsImplemented = false; 
@@ -369,9 +379,21 @@ namespace Motion
         PostStatus(opStatus);
     }
 
+    DSD5217::Drive* DSD5217::CurrentDrive()
+    {
+        if (iopb.unit >= DSD5217_MAX_DISK_DRIVES
+        || !drives[iopb.unit].image)
+            return nullptr;
+
+        return &drives[iopb.unit];
+    }
+
     size_t DSD5217::GetBytesPerSector()
     {
-        return (size_t)((inist.inib.bytesPerSectorHigh << 8) | inist.inib.bytesPerSectorLow);
+        if (!currentDrive)
+            return 0;
+
+        return (size_t)((currentDrive->inib.bytesPerSectorHigh << 8) | currentDrive->inib.bytesPerSectorLow);
     }
 
     // Initialize (00h): the data buffer holds the geometry of the drive being initialised
@@ -379,29 +401,32 @@ namespace Motion
     {
         size_t dba = iopb.dba;
 
-        inist.inib.nrCylinders = MBRead16(dba + 0x00);
-        inist.inib.fixedHeads = MBRead8(dba + 0x02);
-        inist.inib.removableHeads = MBRead8(dba + 0x03);
-        inist.inib.sectorsPerTrack = MBRead8(dba + 0x04);
-        inist.inib.bytesPerSectorLow = MBRead8(dba + 0x05);
-        inist.inib.bytesPerSectorHigh = MBRead8(dba + 0x06);
-        inist.inib.numberOfAlternateCylinders = MBRead8(dba + 0x07);
+        INIB& inib = currentDrive->inib;
+
+        inib.nrCylinders = MBRead16(dba + 0x00);
+        inib.fixedHeads = MBRead8(dba + 0x02);
+        inib.removableHeads = MBRead8(dba + 0x03);
+        inib.sectorsPerTrack = MBRead8(dba + 0x04);
+        inib.bytesPerSectorLow = MBRead8(dba + 0x05);
+        inib.bytesPerSectorHigh = MBRead8(dba + 0x06);
+        inib.numberOfAlternateCylinders = MBRead8(dba + 0x07);
 
         size_t bytesPerSector = GetBytesPerSector();
 
         Logger::Log(DSD5217_LOG_PREFIX, std::format("Initialise unit {}: {} cylinders ({} alternate), {} fixed / {} removable heads, "
-            "{} sectors per track, {} bytes per sector", iopb.unit, inist.inib.nrCylinders, inist.inib.numberOfAlternateCylinders,
-            inist.inib.fixedHeads, inist.inib.removableHeads, inist.inib.sectorsPerTrack, bytesPerSector).c_str());
+            "{} sectors per track, {} bytes per sector", iopb.unit, inib.nrCylinders, inib.numberOfAlternateCylinders,
+            inib.fixedHeads, inib.removableHeads, inib.sectorsPerTrack, bytesPerSector).c_str());
 
         if (!bytesPerSector
         || bytesPerSector > DSD5217_MAXIMUM_BUFFER_SIZE
-        || !inist.inib.sectorsPerTrack)
+        || !inib.sectorsPerTrack)
         {
             Logger::Log(DSD5217_LOG_PREFIX, "Initialise specified a disk format this controller can't do", LogChannels::Warning);
             inist.sb[DSD5217_SB_HARD_ERROR0] |= DSD5217_HARDERR0_ILLEGAL_FORMAT;
             return false;
         }
 
+        currentDrive->initialised = true;
         return true;
     }
 
@@ -457,7 +482,7 @@ namespace Motion
             and the filesystem both describe a fixed number of blocks, so anything landing beyond
             them is lost anyway and only makes the file no longer match its own label.
         */
-        size_t imageSize = hdd->GetSize();
+        size_t imageSize = currentDrive->image->GetSize();
 
         if (diskLinear >= imageSize)
         {
@@ -511,7 +536,7 @@ namespace Motion
 
             // Where this lands depends on the mode - straight to the file, or into the copy-on-write
             // overlay. See disk_image.hpp.
-            if (!hdd->Write(diskLinear + transferred, sectorBuffer, bytesToTransfer))
+            if (!currentDrive->image->Write(diskLinear + transferred, sectorBuffer, bytesToTransfer))
             {
                 Logger::Log(DSD5217_LOG_PREFIX, std::format("Write of {} bytes at 0x{:x} failed",
                     bytesToTransfer, diskLinear + transferred).c_str(), LogChannels::Error);
@@ -583,8 +608,9 @@ namespace Motion
 
             // Clamp against what is left of the image rather than asking for a whole sector and
             // seeing how much comes back - DiskImage refuses a read that runs off the end outright.
-            size_t remainingOnDisk = (diskLinear + transferred < hdd->GetSize())
-                ? (hdd->GetSize() - (diskLinear + transferred)) : 0;
+            size_t imageSize = currentDrive->image->GetSize();
+            size_t remainingOnDisk = (diskLinear + transferred < imageSize)
+                ? (imageSize - (diskLinear + transferred)) : 0;
 
             if (!remainingOnDisk)
             {
@@ -598,7 +624,7 @@ namespace Motion
                 endOfMedia = true;
             }
 
-            if (!hdd->Read(diskLinear + transferred, sectorBuffer, bytesToTransfer))
+            if (!currentDrive->image->Read(diskLinear + transferred, sectorBuffer, bytesToTransfer))
             {
                 endOfMedia = true;
                 break;
@@ -656,11 +682,12 @@ namespace Motion
         size_t sectorWeWant = iopb.sector;
 
         // figure out the disk information
-        size_t sectorsPerTrack = inist.inib.sectorsPerTrack;
+        size_t sectorsPerTrack = currentDrive->inib.sectorsPerTrack;
         size_t bytesPerSector = GetBytesPerSector();
-        size_t numCyls = inist.inib.nrCylinders;
+        size_t numCyls = currentDrive->inib.nrCylinders;
 
-        size_t nrHeads = (iopb.deviceCode == DSD5217_DEVICE_CODE_FLOPPY) ? inist.inib.removableHeads : inist.inib.fixedHeads;
+        size_t nrHeads = (iopb.deviceCode == DSD5217_DEVICE_CODE_FLOPPY)
+            ? currentDrive->inib.removableHeads : currentDrive->inib.fixedHeads;
        
         // floppy - cyl's start at 1, otherwise 0
         if (iopb.deviceCode == DSD5217_DEVICE_CODE_FLOPPY)
@@ -694,7 +721,13 @@ namespace Motion
         // Both are null when the board was never fitted.
         delete dsdExtension;
 
-        if (hdd)
-            Profile::CloseDisk(hdd);
+        for (Drive& drive : drives)
+        {
+            if (!drive.image)
+                continue;
+
+            Profile::CloseDisk(drive.image);
+            drive.image = nullptr;
+        }
     }
 };

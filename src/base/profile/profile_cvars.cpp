@@ -32,6 +32,13 @@ namespace Motion
             reach for while developing: the image on disk is never touched, so it does not matter how
             the emulator stops, and it does not matter if two of them are running. See disk_image.hpp.
         */
+        /*
+            Which disk controller is fitted: dsd, storager or none. A machine has one, and which one
+            it is decides what the machine *is* - the DSD makes it a 3115, the Storager a 3130.
+            profileDisk0Path and profileDisk1Path are the two drives on whichever it is.
+        */
+        diskController = Cvar::Get("diskController", "dsd");
+
         diskWriteMode = Cvar::Get("diskWriteMode", "direct");
         diskCommitOnExit = Cvar::Get("diskCommitOnExit", "0");
     }
