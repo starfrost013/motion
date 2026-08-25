@@ -495,9 +495,12 @@ anything else. IRIX 3.7 is EFS's *ancestor* and has **no magic at all** - `fs_nc
 file in place when the new contents still fit the blocks already allocated, which is two edits (the
 data blocks and `di_size`) and needs no allocator.
 
-**The partition table is at image block 0**, not an SGI `dvh` - magic `0x00072959`, the drive name
-("Priam V170") at 0x5c, and partition entries of `{first(4), size(4)}` starting at **offset 0x1a**:
-md0a root at block **119** (17850), md0b swap at 17969 (17731), md0c `/usr` at **35700** (79730).
+**The partition table is at image block 0**, not an SGI `dvh` - it is `struct disk_label` from
+`sys/h/dklabel.h`, magic `0x00072959`, the drive name ("Priam V170") at 0x5c, `d_controller` at 0x06
+and partition entries of `{first(4), size(4)}` in `d_map[8]` starting at **offset 0x16** (an earlier
+version of this note said 0x1a, which is four bytes out): md0a root at block **119** (17850), md0b
+swap at 17969 (17731), md0c `/usr` at **35700** (79730). One label format serves every controller -
+see `resume-prompt-disk.md`.
 
 ## Where the boot stops now
 
@@ -864,9 +867,11 @@ somewhere unexpected, this is the first thing to re-check. The graphics console 
 drives it with `xdotool` instead. The mouse is wired up now; what is not is any way to drive it from a script, so every mouse test
 here goes through `xdotool`.
 
-No Ethernet, no Interphase SMD or Storager, no FPA, no DSD write path, no tape or floppy. **The
-guest cannot write to the disk at all**, so anything that has to persist is patched into the image
-from the host with `scratch/efswrite.py`. Installation media does exist after all - the GL2-W3.6
+No Ethernet, no Interphase SMD or Storager, no FPA, no tape or floppy. **The DSD write path works
+now** - the guest can write to `md0`, and `/etc/fsck` repairs its own filesystem - which means the
+machine has to be allowed to `sync` before it is stopped, and that two emulators on one image will
+really corrupt it. **`resume-prompt-disk.md` is the handoff for storage**; the Storager is what is
+left of it, and it is what would make this machine a 3130 rather than a 3115. Installation media does exist after all - the GL2-W3.6
 tapes in `~/repos/sgiresearch/iris3000` - but nothing needs installing, because `/usr` on `md0c` is
 the same release and already complete. See the GUI section above.
 
