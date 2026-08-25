@@ -30,12 +30,7 @@ namespace Motion
             return (rom[addr]); 
         };
 
-        /*
-            Byte at a time, big endian, at the address given. Indexing a 16 or 32 bit view with
-            addr >> 1 / addr >> 2 discarded the low address bits, and a 68020 is allowed to make a
-            misaligned word or long access - see the note in memory.cpp, which had the same bug where
-            it mattered far more.
-        */
+        // Byte at a time, big endian, at the address given.
         uint16_t Read16(size_t addr) override 
         { 
             addr %= (size_t)promSize->GetValue();

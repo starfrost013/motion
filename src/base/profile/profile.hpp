@@ -39,13 +39,7 @@ namespace Motion
     
     #define PROFILE_LOG_PREFIX      "Profile"
 
-    /*
-        Which disk controller is fitted. A machine has one - the DSD 5217 makes it a 3115 and the
-        Interphase Storager makes it a 3130, and the two are alternatives rather than a pair, which is
-        why this is one string rather than an enable flag per board. profileDisk0Path and
-        profileDisk1Path are then the two physical drives hanging off whichever one it is: md0/md1 on
-        the DSD, si0/si1 on the Storager.
-    */
+    // Which disk controller is fitted.
     enum class DiskControllerType
     {
         None,

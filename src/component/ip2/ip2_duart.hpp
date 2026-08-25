@@ -30,17 +30,7 @@ namespace Motion
     #define DUART_NUM_REGS                          16
     #define DUART_NUM_INPUT_PORTS                   7
 
-    /*
-        The counter/timer is a 16 bit down counter clocked from whichever source ACR[6:4] selects.
-        Only the crystal sources are wired on this board - the external IP2 pin and the two
-        transmitter clocks go nowhere. X1 is the standard 3.6864MHz DUART crystal, which is the same
-        one the baud rate tables further down assume.
-
-        The kernel needs this before it will get anywhere: _calibuzz starts the counter, spins its
-        software delay loop, stops the counter and divides to work out how many loop iterations make a
-        millisecond. With a counter that never counts, that division produces a delay loop that never
-        finishes and _msdelay never returns.
-    */
+    // The counter/timer is a 16 bit down counter clocked from whichever source ACR[6:4] selects.
     #define DUART_X1_HZ                             3686400
     #define DUART_COUNTER_MODE(acr)                 (((acr) >> 4) & 0x7)
     #define DUART_COUNTER_MODE_IS_TIMER(acr)        (DUART_COUNTER_MODE(acr) & 0x4)
@@ -125,18 +115,7 @@ namespace Motion
     #define DUART_READ_RX_HOLD_B                    0xB             // 0xB: [Read] Rx Holding Register B
     #define DUART_READ_INPUT_PORTS                  0xD             // 0xD: [Read] Input Ports IP0-IP6
 
-    /*
-        Carrier detect, and it is **active low** - a clear bit means carrier present. sduart.c says so
-        outright: "the input is low-true", and du_act() clears DP_DCD when the bit reads set.
-
-            #if defined(IP2) || defined(IP4)
-            #define IPORT_DCDA  0x08        // dcd input bit for A ports
-            #define IPORT_DCDB  0x04        // dcd input bit for B ports
-
-        This matters the moment anything reaches multi-user. /etc/gettydefs' co_9600 is
-        "B9600 SANE TAB3" with no CLOCAL, so du_open() waits for carrier before it will open the line,
-        and a getty that never opens is a console that never prints `login:`.
-    */
+    // Carrier detect, and it is **active low** - a clear bit means carrier present.
     #define DUART_IPORT_DCDA                        0x08
     #define DUART_IPORT_DCDB                        0x04
     #define DUART_READ_START_COUNTER_CMD            0xE             // 0xE: [Read] Start Counter Command

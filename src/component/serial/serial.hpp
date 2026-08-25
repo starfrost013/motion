@@ -75,8 +75,6 @@ namespace Motion
         void ClearTxLog();
 
         // NOTE: this might be too slow because we have to tell everything about this event.
-        // we can design a custom event system for serial ports if this turns out to be the case. but since serial ports run at low clock it is probably fine
-        /// @brief Dump every memory editor if this line matches dumpOnConsoleMatch.
         void CheckConsoleTrigger();
 
         void FireReceiveEvent(uint8_t data);
@@ -104,15 +102,7 @@ namespace Motion
         inline static Cvar* dumpOnConsoleMatch = nullptr;
         inline static bool dumped = false;
 
-        /*
-            Receive queue - fed directly via AddRxByte()/AddRxString().
-
-            Everything that types at a line does so from the render thread (the debugger's serial
-            console, consoleInput), while the chip drains the queue from the emulation thread, so
-            the two ends genuinely do run at once and the queue has to be guarded. Without this the
-            pushes and the pop race and characters go missing, which reads as a flaky terminal
-            rather than as a bug.
-        */
+        // Receive queue - fed directly via AddRxByte()/AddRxString().
         std::queue<uint8_t> rxQueue;
         std::mutex rxQueueMutex;
 

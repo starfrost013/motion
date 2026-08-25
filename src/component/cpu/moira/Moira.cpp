@@ -380,12 +380,7 @@ Moira::processException(const std::exception &exc)
 
         if (auto be = dynamic_cast<const BusError *>(&exc); be) {
 
-            /*
-                The handler will restart this instruction, so put back any -(An)/(An)+ update it
-                already made - see anRollback. The registers are restored before the frame is
-                stacked, so what the exception handler saves is the state the instruction is about
-                to be re-entered with.
-            */
+            // The handler will restart this instruction, so put back any -(An)/(An)+ update it already made - see anRollback.
             while (anRollbackCount) {
 
                 anRollbackCount--;

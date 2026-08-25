@@ -1,21 +1,4 @@
-/*
-    m  o  t  i  o  n
-    The SGI Emulator
-
-    Copyright (c)2026 starfrost
-
-    ip2_mouse.cpp: the quadrature encoder, and the interrupt it raises.
-
-    The whole protocol is four bits and one interrupt. Every grating transition the mouse makes, the
-    board interrupts on level 7; _mouseintr reads the quadrature word, works out which axis moved and
-    which way from two pairs of bits, and adjusts a counter. The read is the acknowledgement.
-
-    So the emulated side is a pace-yourself problem rather than a decode problem: host movement piles
-    up as a signed backlog, and one tick of it is handed over at a time, a new interrupt only being
-    raised once the guest has taken the last one. That makes the rate exactly the rate the guest can
-    service, which matters more here than anywhere else on this machine - level 7 is what a 68020
-    calls non-maskable, so there is no spl the kernel can hide behind if this floods.
-*/
+/* motion - The SGI Emulator. Copyright (c)2026 starfrost. ip2_mouse.cpp: the quadrature encoder, and the interrupt it raises. */
 
 #include <base/emulation.hpp>
 #include <component/ip2/ip2_mouse.hpp>
@@ -74,20 +57,12 @@ namespace Motion
                     motion.deltaX, motion.deltaY, pendingX.load(), pendingY.load(), ticksDelivered).c_str(), LogChannels::Warning);
             }
 
-            /*
-                The host's y grows downwards and GL's grows upwards, and the driver does not flip it
-                anywhere: gl_valuators takes MOUSEY straight through to the cursor's y, and DC4 does
-                the screen flip much further down. So the sign has to be turned round here, at the
-                one place that knows it is looking at a host pointer.
-            */
+            // The host's y grows downwards and GL's grows upwards, and the driver does not flip it anywhere: gl_valuators takes MOUSEY straight through to the.
             AddMotion((int32_t)motion.deltaX, -(int32_t)motion.deltaY);
         }
     }
 
-    /*
-        Add to the backlog, saturating rather than wrapping. Clamping loses movement, which is the
-        right trade: a pointer that stops when the hand stops is better than one that keeps going.
-    */
+    // Add to the backlog, saturating rather than wrapping.
     void IP2Mouse::AddMotion(int32_t deltaX, int32_t deltaY)
     {
         auto accumulate = [](std::atomic<int32_t>& pending, int32_t delta)
@@ -137,12 +112,7 @@ namespace Motion
         return word;
     }
 
-    /*
-        The handler's one and only access. It reads the word to find out what moved and, by reading
-        it, dismisses the interrupt - so this is where the tick is finally taken off the backlog, not
-        where it was offered. A read with nothing outstanding is somebody looking rather than the
-        machine acknowledging, and answers idle without disturbing anything.
-    */
+    // The handler's one and only access.
     uint16_t IP2Mouse::ReadQuadrature()
     {
         uint16_t word = QuadratureWord();
@@ -172,12 +142,7 @@ namespace Motion
         return word;
     }
 
-    /*
-        Offer the next transition, if the guest has finished with the last one. One interrupt carries
-        at most one tick per axis, which is what the handler is written to expect - it tests the two
-        fire bits independently out of a single read - so a diagonal drains at the rate of its longer
-        side rather than the sum of both.
-    */
+    // Offer the next transition, if the guest has finished with the last one.
     void IP2Mouse::Tick()
     {
         if (irqAsserted)

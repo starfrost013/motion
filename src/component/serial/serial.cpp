@@ -21,11 +21,7 @@ namespace Motion
         if (txLog.size() > SERIAL_TXLOG_MAX_SIZE)
             txLog.erase(0, SERIAL_TXLOG_PURGE_SIZE);
 
-        /*
-            Also put it in the log a line at a time. The tx log only exists to be drawn in Coherent,
-            which is no help at all when the machine is being run headless or from a script, and this
-            line is where every message the PROM and the kernel print comes out.
-        */
+        // Also put it in the log a line at a time.
         if (data == '\n' || data == '\r')
         {
             if (!pendingLine.empty())
@@ -51,12 +47,7 @@ namespace Motion
         FireTransmitEvent(data);
     }
 
-    /*
-        The interesting moment in a boot is usually one you cannot click a menu fast enough to catch,
-        and there is no menu at all when running headless. Setting dumpOnConsoleMatch to a substring
-        writes every memory editor out the moment the guest prints a line containing it, so
-        +set dumpOnConsoleMatch panic catches the machine as it dies.
-    */
+    // The interesting moment in a boot is usually one you cannot click a menu fast enough to catch, and there is no menu at all when running headless.
     void SerialLine::CheckConsoleTrigger()
     {
         if (!dumpOnConsoleMatch)

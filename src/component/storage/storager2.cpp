@@ -1,11 +1,4 @@
-/*
-    m  o  t  i  o  n
-    The SGI Emulator
-
-    Copyright (c)2026 starfrost
-
-    storager2.cpp: The Interphase Storager 2 - "sii". Everything here is in MULTIBUS byte offsets; Read8/Write8 uncross the lanes once
-*/
+/* motion - The SGI Emulator. Copyright (c)2026 starfrost. storager2.cpp: The Interphase Storager 2 - "sii". */
 
 #include <component/storage/storager2.hpp>
 

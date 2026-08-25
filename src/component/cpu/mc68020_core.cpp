@@ -65,12 +65,7 @@ namespace Motion
         isInReset = false;
         AddrSpace::SetFaultsEnabled(true);
 
-        /*
-            Off by default because recording a PC per instruction is not free. Turn it on with
-            +set logCpuTrace 1 when something reads or writes an address nothing claims and you need
-            to know who did it - it prints the register file, the top of the stack and the branches
-            that led there, which is how the kernel load was tracked down.
-        */
+        // Off by default because recording a PC per instruction is not free.
         logCpuTrace = Cvar::Get("logCpuTrace", "0");
         traceEnabled = logCpuTrace->GetValue();
         MC68020MoiraBridge::traceExceptions = traceEnabled;
@@ -83,27 +78,13 @@ namespace Motion
         }
     }
 
-    /*
-        Bring-up instrumentation for the kernel boot. When something reads or writes an address that
-        nothing claims, the interesting question is never "what address" - it is "who was running, and
-        what did they think they were pointing at". So keep a ring of recently retired PCs and dump it,
-        with the register file and the top of the stack, the first few times we miss.
-    */
+    // Bring-up instrumentation for the kernel boot.
     static uint32_t tracePcs[PC_TRACE_SIZE] = {0};
     static uint64_t traceCount = 0;
     static int32_t traceDumps = 0;
     static bool traceKernelSeen = false;
 
-    /*
-        Registers, the top of the stack and the control flow that led here. Shared by every fault
-        dump: the interesting question at a fault is never "what address", it is "who was running
-        and what did they think they were pointing at".
-
-        rawPcs asks for that many retired PCs verbatim as well. The collapsed edge list below is the
-        right shape for "how did we get into this routine", but when the suspect is a single
-        instruction - a push that moved the stack pointer twice, say - the only thing that settles
-        it is the untouched instruction sequence leading in.
-    */
+    // Registers, the top of the stack and the control flow that led here.
     static void TraceFaultState(int32_t rawPcs)
     {
         auto& cpu = tracedCpu->moiraCpu;
@@ -124,11 +105,7 @@ namespace Motion
                     (i < 0 ? -i : i) * 4, AddrSpace::ReadU32(sp + (i * 4))).c_str(), LogChannels::Warning);
         }
 
-        /*
-            Printing every PC is useless - a copy loop fills the whole window. What matters is the
-            control flow: print only the discontinuities, which are the branches, calls and returns
-            that got us here. Consecutive identical edges are a loop, so collapse them.
-        */
+        // Printing every PC is useless - a copy loop fills the whole window.
         uint64_t total = (traceCount < PC_TRACE_SIZE) ? traceCount : PC_TRACE_SIZE;
         std::string line;
         uint32_t lastFrom = 0, lastTo = 0;
@@ -214,12 +191,7 @@ namespace Motion
         TraceFaultState(0);
     }
 
-    /*
-        A user mode access to the null guard page is the fault that is about to become SIGSEGV -
-        every other user fault is demand paging doing its job. It is the only one worth the full
-        dump, and there are only a handful of them per boot, so they are not rate limited with the
-        unmapped dumps.
-    */
+    // A user mode access to the null guard page is the fault that is about to become SIGSEGV - every other user fault is demand paging doing its job.
     static void TraceFatalUserFault(size_t addr, bool isWrite)
     {
         if (!tracedCpu || traceDumps >= PC_TRACE_MAX_DUMPS)
@@ -235,11 +207,7 @@ namespace Motion
         TraceFaultState(PC_TRACE_FATAL_RAW_PCS);
     }
 
-    /*
-        One-shot: the first time the CPU executes out of the kernel segment, show what the kernel
-        segment actually resolves to. If the PROM handed control over with the map still pointing at
-        the wrong frames, everything after this is noise.
-    */
+    // One-shot: the first time the CPU executes out of the kernel segment, show what the kernel segment actually resolves to.
     static void TraceKernelEntry(uint32_t pc)
     {
         IP2MMU* mmu = Emulation::GetMachine()->FindComponentByType<IP2MMU>();
@@ -294,13 +262,7 @@ namespace Motion
         }
         catch (const std::exception& exc)
         {
-            /*
-                Moira's processException rethrows anything that is not an address error or a bus
-                error, and a double fault escapes it too because it is thrown as a pointer and caught
-                by reference. Nothing above this catches, so without this the guest can terminate the
-                emulator by faulting in the wrong place - which the kernel manages once it starts
-                probing for boards that are not fitted.
-            */
+            // Moira's processException rethrows anything that is not an address error or a bus error, and a double fault escapes it too because it is thrown as a.
             if (escapedExceptions < MC68020_MAX_ESCAPED_EXCEPTIONS)
             {
                 escapedExceptions++;

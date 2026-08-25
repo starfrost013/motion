@@ -41,12 +41,7 @@ namespace Motion
         /// @brief Write this editor's buffer out to the dumps folder.
         void DumpMemory();
 
-        /*
-            Dumping is otherwise only reachable through the editor's menu, which is no use when the
-            machine is being run headless or from a script - and the interesting moment is usually one
-            you cannot click fast enough for anyway. Every editor registers itself here so the whole
-            set can be written out at once, see dumpOnConsoleMatch.
-        */
+        // Dumping is otherwise only reachable through the editor's menu, which is no use when the machine is being run headless or from a script - and the.
         static void DumpAll(const char* reason);
 
     private:

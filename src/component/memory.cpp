@@ -52,13 +52,7 @@ namespace Motion
         Coherent::RegisterExtension(editor);
     }
 
-    /*
-        Reads and writes used to wrap with addr %= GetRamCapacity(), which also made every bounds
-        check below it unreachable. RAM that is not fitted does not alias onto RAM that is - it reads
-        as zero and swallows writes, which is both what MAME's IP2 RAM handler does and what the
-        PROM's memory sizing loop depends on. The Multibus slave map can also aim a transfer at a
-        frame past the end of RAM, and that has to read zero rather than corrupt a low page.
-    */
+    // Reads and writes used to wrap with addr %= GetRamCapacity(), which also made every bounds check below it unreachable.
     bool Memory::IsInRange(size_t addr, size_t width, const char* what)
     {
         // The whole operand has to fit: a long read one byte short of the end used to run off the allocation.
@@ -79,27 +73,7 @@ namespace Motion
         return false;
     }
 
-    /*
-        Every access below assembles the value a byte at a time, big endian, at the exact address it
-        was given.
-
-        It used to index a 16 or 32 bit view of the array with addr >> 1 or addr >> 2, which
-        silently threw the bottom one or two address bits away. **The 68020 permits misaligned word
-        and long operands** - unlike the 68000 and 68010, which take an address error - and splits
-        them into as many bus cycles as it needs, so a compiler is free to emit `move.l (a0)+,(a1)+`
-        over a buffer that is not four byte aligned, and IRIX's does. Rounding the address down meant
-        every such access read or wrote up to three bytes early, which shifted the data by exactly
-        (addr & 3) bytes and was invisible whenever the buffer happened to be aligned.
-
-        What that looked like: a byte lost or gained at the front of a string. `tset -s -Q` printing
-        `setenv TERM |wsiri ;` for `wsiris` (its name pointer landed one past a 4 byte boundary, so
-        every long the copy loop read came from one byte lower, dragging the preceding `|` in and
-        dropping the trailing `s`), `telinit` arriving as `elinit`, `PST8PDT` as `TPST8PDT`. It read
-        as random because it depends purely on where a buffer happens to sit.
-
-        gcc and clang both fold the byte assembly back into one unaligned load plus a bswap, so this
-        is not slower than the version that was wrong.
-    */
+    // Every access below assembles the value a byte at a time, big endian, at the exact address it was given.
 
     uint8_t Memory::Read8(size_t addr)
     {

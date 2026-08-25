@@ -195,14 +195,7 @@ namespace Motion
         }
         else
         {
-            /*
-                Only the three RAM segments go through the page map. MAME's mem_map sends segment 3
-                straight to sys_map and segments 4 and 5 straight out to the Multibus, and the IP2
-                schematic agrees - the map RAM sits between the CPU and DRAM, not between the CPU and
-                the backplane. Running segment 4 through the map with a base of zero silently
-                redirected the PROM's Multibus accesses into whatever page table entry happened to
-                match, which is how the Multibus map programming was going missing.
-            */
+            // Only the three RAM segments go through the page map.
             *finalAddress = addr;
             return true; 
         }
@@ -290,8 +283,7 @@ namespace Motion
             return false; 
         }
         
-        // calculate a real physical ram address with 13...0 page adn teh bottom1 0 bits of the real address
-        // 4KB pages, so the offset kept is 12 bits: a 13-bit mask ORs VA bit 12 into the frame number and dies once the kernel maps for real.
+        // calculate a real physical ram address with 13...0 page adn teh bottom1 0 bits of the real address 4KB pages, so the offset kept is 12 bits: a 13-bit.
         *finalAddress = (page & PAGETABLE_FRAME_MASK) << 12 | (addr & 0xFFF);
         //Logger::Log(LOG_PREFIX_IP2MMU, std::format("Translated virtual address {:x} to physical address {:x}", addr, *finalAddress).c_str(), LogChannels::Debug);
         return true; 

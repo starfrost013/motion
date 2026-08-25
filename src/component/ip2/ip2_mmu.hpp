@@ -118,12 +118,7 @@ namespace Motion
             mmuExtension = new CoherentExtensionIP2MMU(this);
             Coherent::RegisterExtension(mmuExtension);
 
-            /*
-                The page table is not in system RAM - it is 64KB of SRAM on the board - so a RAM dump
-                does not contain it. When a process takes an unexpected fault this is the first thing
-                worth looking at, so give it an editor of its own. Entries are host order here, not
-                the big endian the guest sees.
-            */
+            // The page table is not in system RAM - it is 64KB of SRAM on the board - so a RAM dump does not contain it.
             CoherentEditor::Settings pagetableSettings;
             pagetableSettings.buf = (uint8_t*)pagetable;
             pagetableSettings.bufSize = sizeof(pagetable);

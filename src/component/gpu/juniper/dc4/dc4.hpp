@@ -51,11 +51,7 @@ namespace Motion
 
     #define DC4_COLOUR_RAM_SIZE         49152
 
-    /*
-        The colour RAM is sixteen banks, each 256 entries of red, green and blue - so 768 words a
-        bank. DCMULTIMASK is the driver's name for the index mask and DCIndexToReg for the shift that
-        gets the bank out of a colour, which is how gl_domapcolors addresses it.
-    */
+    // The colour RAM is sixteen banks, each 256 entries of red, green and blue - so 768 words a bank.
     #define DC4_COLOURMAP_INDEX_MASK    0xFF
     #define DC4_COLOURMAP_BANK_MASK     0x0F
     #define DC4_COLOURMAP_BANK_STRIDE   768

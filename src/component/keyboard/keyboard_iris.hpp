@@ -21,16 +21,7 @@ namespace Motion
 {
     // this is here because the presence of the keyboard is how the serial monitor gets entered into.
 
-    /*
-        "Who are you". The host asks for the keyboard's type with a two byte sequence and the
-        keyboard answers with one byte saying what it is - kb.h calls the request WHO_RU_0/WHO_RU_1
-        and the answer KB_IRIS_STD, octal 252.
-
-        It gets asked more than once. The PROM asks at power on and IRIX's own GL2 driver asks again
-        from kb_init(), and until it is answered kb_softchar() treats whatever arrives next as the
-        reply. Answering only the first time therefore costs the first keystroke after boot, which
-        IRIX consumes and complains about as "Unknown Keyboard - assuming IRIS 3000 Keyboard".
-    */
+    // "Who are you".
     #define KEYBOARD_WHO_ARE_YOU_0      0x00
     #define KEYBOARD_WHO_ARE_YOU_1      0x10
 
@@ -56,23 +47,7 @@ namespace Motion
     #define KEYBOARD_STATE_CAPSLOCK     (1 << 6)
     #define KEYBOARD_STATE_SETUP        (1 << 7)
 
-    /*
-        The scancode a key press puts on the wire is the key number with bit 7 telling the host
-        whether it went down or came up, and IRIX reads it as
-
-            #define KB_SCANCTOKEYC(c)   ((c) & 0x7f)
-            #define KB_SCANCTOUPDN(c)   (!((c) & 0x80))
-
-        so **bit 7 clear is a key going down and bit 7 set is a key coming up**. Both halves have to
-        be sent. kb_translate() keeps shift, control and caps lock entirely from these - it sets a
-        state bit on the down stroke and clears it on the up - and every key it cannot explain the
-        modifier state for is dropped on the floor by
-
-            default:  kb_ringbell(); return;
-
-        which is what a missing break code feels like from the other side: the keyboard stops
-        working until the modifier is pressed again.
-    */
+    // The scancode a key press puts on the wire is the key number with bit 7 telling the host whether it went down or came up, and IRIX reads it as #define.
     #define KEYBOARD_SCANCODE_KEY_MASK  0x7F
     #define KEYBOARD_SCANCODE_RELEASE   0x80
     #define KEYBOARD_SCANCODE_COUNT     128
@@ -110,11 +85,7 @@ namespace Motion
         bool shutUpBeep = false; 
         bool shutUpLed = false; 
 
-        /*
-            Which keys the guest currently believes are held. Kept so a break code can be
-            manufactured for a key that goes down twice without coming up in between, which is what
-            happens whenever a key-up is delivered somewhere other than here.
-        */
+        // Which keys the guest currently believes are held.
         bool keyDown[KEYBOARD_SCANCODE_COUNT] = {};
 
         // maps SDL key events to SGI keycodes
@@ -181,13 +152,7 @@ namespace Motion
             { SDLK_KP_8,         67 },
             { SDLK_KP_5,         68 },
             { SDLK_KP_6,         69 },
-            /*
-                Buttons 70, 71, 77 and 78 are the keypad's own PF1 to PF4, which a PC keypad does not
-                have. F1 to F4 below are buttons 86 to 89, "F1->PF1" in the IRIX table, and send the
-                same 0x81 to 0x84, so nothing is lost by leaving these unmapped. They used to be
-                listed as F1 to F4 here and, being duplicates, silently won over the real entries -
-                an unordered_map built from an initialiser list keeps the first of each key.
-            */
+            // Buttons 70, 71, 77 and 78 are the keypad's own PF1 to PF4, which a PC keypad does not have.
             { SDLK_KP_9,         74 },
             { SDLK_KP_MINUS,     75 },
             { SDLK_KP_COMMA,     76 },

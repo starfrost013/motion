@@ -5,15 +5,7 @@ namespace Motion
 {
     Cvar* bootDevice;
 
-    /*
-        Which device the PROM loads the kernel from. The PROM's own help text names them:
-
-            "sd(or si) - storager disk."   "st(or sq) - storager cartridge tape."
-            "sf        - storager floppy disk."
-
-        so a machine whose only disk hangs off a Storager wants sd here. md, the DSD winchester, is
-        the default because that is the controller the shipped disk image is labelled for.
-    */
+    // Which device the PROM loads the kernel from.
     struct BootDeviceName
     {
         const char* name;
@@ -53,11 +45,7 @@ namespace Motion
         // Reasonable defaults; this used to be uninitialised, so the boot device was whatever was in the heap that day.
         switchState = (SWITCH_AUTOBOOT | SWITCH_BOOT_DEVICE_MD);
 
-        /*
-            Default to the disk of whichever controller is fitted, because a machine that cannot find
-            its own boot device is a confusing thing to hand somebody. An explicit +set bootDevice
-            still wins - Cvar::Get returns the existing convar and ignores the default.
-        */
+        // Default to the disk of whichever controller is fitted, because a machine that cannot find its own boot device is a confusing thing to hand somebody.
         bootDevice = Cvar::Get("bootDevice",
             (Profile::GetDiskController() == DiskControllerType::Storager) ? "sd" : "md");
 

@@ -1,11 +1,4 @@
-/*
-    m  o  t  i  o  n
-    The SGI Emulator
-
-    Copyright (c)2026 starfrost
-
-    ip2_rtc.cpp: The MC146818 real time clock on the IP2.
-*/
+/* motion - The SGI Emulator. Copyright (c)2026 starfrost. ip2_rtc.cpp: The MC146818 real time clock on the IP2. */
 
 #include <ctime>
 #include <base/emulation.hpp>
@@ -65,11 +58,7 @@ namespace Motion
         }
     }
 
-    /*
-        The clock and calendar registers are not stored - they are produced from the host clock on
-        demand, so the emulated machine comes up believing it is whatever time it actually is.
-        Everything else is a plain register or battery backed RAM.
-    */
+    // The clock and calendar registers are not stored - they are produced from the host clock on demand, so the emulated machine comes up believing it is.
     uint8_t IP2Clock::ReadRegister(uint8_t reg)
     {
         if (reg == RTC_REG_C)
@@ -135,10 +124,7 @@ namespace Motion
         return (uint8_t)(((value / 10) << 4) | (value % 10));
     }
 
-    /*
-        Rate select picks a tap off the divider chain. Codes 1 and 2 are the odd ones out - they are
-        the same two rates as 8 and 9 rather than continuing the halving - and 0 turns it off.
-    */
+    // Rate select picks a tap off the divider chain.
     uint32_t IP2Clock::PeriodicRate()
     {
         uint32_t rate = registers[RTC_REG_A] & RTC_A_RATE_SELECT;
@@ -173,11 +159,7 @@ namespace Motion
         if ((now - lastPeriodicNs) < periodNs)
             return;
 
-        /*
-            Only ever one period behind. The emulated machine runs slower than the host clock, so
-            catching up tick for tick after a slow patch would deliver a burst of clock interrupts
-            the kernel would count as real elapsed time.
-        */
+        // Only ever one period behind.
         lastPeriodicNs = now;
 
         registers[RTC_REG_C] |= RTC_C_PERIODIC;

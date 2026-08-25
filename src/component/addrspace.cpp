@@ -279,12 +279,7 @@ namespace Motion
         WriteU32(addr, (uint32_t)value);
     }
 
-    /*
-        A hole in device space means nothing drove DSACK, the cycle times out and BERR is asserted.
-        A read of memory that simply isn't fitted is NOT the same thing - it reads as zero, which is
-        what MAME's IP2 RAM handler does and what the PROM's memory sizing loop depends on, since it
-        walks down from 31MB writing patterns and reading them back to find the top of RAM.
-    */
+    // A hole in device space means nothing drove DSACK, the cycle times out and BERR is asserted.
     void AddrSpace::SignalFaultIfDeviceSpace(size_t addr, bool isWrite)
     {
         if (addr < ADDRSPACE_DEVICE_SPACE_START)

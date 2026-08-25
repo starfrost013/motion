@@ -24,30 +24,14 @@ namespace Motion
     {
         friend class MC68020;
 
-        /*
-            The special status word describes the failed access to whoever handles the fault. The
-            IP2 kernel's trap() reads it out of the format A frame to decide what kind of fault it
-            was, then hands the address to pagein(), so a wrong one turns a page fault into a
-            SIGSEGV.
-
-            FC and FB - "the access that faulted was an instruction prefetch" - are deliberately
-            left clear. A 68020 sets them because a prefetch fault stacks no address at all, which
-            leaves the OS to guess it from the PC (trap() guesses PC+2 or PC+4). We always know
-            exactly which address faulted, so reporting a data cycle fault and stacking the real
-            address tells the kernel the truth instead of making it guess.
-        */
+        // The special status word describes the failed access to whoever handles the fault.
         static constexpr uint16_t SSW_DATA_FAULT     = 0x0400;  // DF: rerun the data cycle
         static constexpr uint16_t SSW_READ           = 0x0100;  // RW: set for a read
         static constexpr uint16_t SSW_SIZE_BYTE      = 0x0040;
         static constexpr uint16_t SSW_SIZE_WORD      = 0x0080;
         static constexpr uint16_t SSW_FC_SUPERVISOR  = 0x0004;  // FC2
 
-        /*
-            The MMU records a failed translation rather than raising it, because building a bus error
-            stack frame needs the core. Moira lets us throw one straight out of the memory callbacks -
-            it catches std::exception in its execute loop and runs it through processException - so this
-            is where an MMU fault becomes a real exception vector 2.
-        */
+        // The MMU records a failed translation rather than raising it, because building a bus error stack frame needs the core.
         void RaiseBusErrorIfFaulted(bool isWrite, bool isByte) const
         {
             size_t faultAddress = 0;
@@ -78,11 +62,7 @@ namespace Motion
                     IsSupervisor() ? "supervisor" : "user").c_str(), LogChannels::Warning);
             }
 
-            /*
-                Almost every user fault is demand paging working correctly. The one that is not is an
-                access to the null guard page, which trap() cannot pagein and turns straight into
-                SIGSEGV - so that is the only one worth a full state dump.
-            */
+            // Almost every user fault is demand paging working correctly.
             if (fatalUserFaultHook && !IsSupervisor() && faultAddress < MC68020_USER_NULL_GUARD_END)
                 fatalUserFaultHook(faultAddress, isWrite);
 
@@ -128,12 +108,7 @@ namespace Motion
                 && (vector < MC68020_VECTOR_INTERRUPT_FIRST || vector > MC68020_VECTOR_INTERRUPT_LAST);
         }
 
-        /*
-            didExecuteException runs after the vector has been taken, so the PC it can report is the
-            handler's, which says nothing about what went wrong. This one runs first and still sees
-            the faulting instruction - pc0 rather than pc, because pc has already moved on past the
-            opcode by the time an instruction faults.
-        */
+        // didExecuteException runs after the vector has been taken, so the PC it can report is the handler's, which says nothing about what went wrong.
         void willExecuteException(Motion::Lisburn::M68kException exc, uint16_t vector) override
         {
             if (WorthReporting(vector))
@@ -160,19 +135,10 @@ namespace Motion
         inline static void (*fatalUserFaultHook)(size_t addr, bool isWrite) = nullptr;
 
     public:
-        /*
-            The IP2 does not autovector. An interrupt acknowledge cycle reads a vector number out of
-            U118, a PROM addressed by the interrupt level and the state of the local interrupt lines,
-            which is what puts the scheduler clock on vector 0x51 rather than autovector 30.
-        */
+        // The IP2 does not autovector.
         void UseVectoredInterrupts() { irqMode = Motion::Lisburn::IrqMode::USER; };
 
-        /*
-            Moira's default routes disassembly reads through read16, which for us is a real bus cycle
-            that can raise a bus error. The debugger disassembles around wherever the PC happens to
-            be, every frame, from outside the execute loop - so that throw had nothing to catch it and
-            took the whole process down.
-        */
+        // Moira's default routes disassembly reads through read16, which for us is a real bus cycle that can raise a bus error.
         uint16_t read16Dasm(uint32_t addr) const override
         {
             AddrSpacePeek peek;

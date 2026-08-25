@@ -35,18 +35,7 @@ namespace Motion
     #define MULTIBUS_IO_START               0x50000000
     #define MULTIBUS_IO_END                 0x5000FFFF
 
-    /*
-        The IP2 does not put its RAM on the backplane directly. Sheet 14 (MAP.ADDRESS.GENERATION)
-        sits four AM2148 1Kx4 SRAMs between the two, giving 1024 sixteen-bit entries of which the low
-        14 bits are a page frame number. A Multibus address in the first megabyte is translated as
-        frame[addr >> 12] << 12 | (addr & 0xFFF), so the window is 256 pages of 4KB, and the second
-        megabyte is the map SRAM itself - writing anywhere inside a 4KB block sets that block's entry.
-
-        This is how the PROM aims DMA. It fills all 256 entries at 0x30000770 with
-        map[i] = [0x33000010] + i before it boots anything, then hands Multibus addresses to the disk
-        controller and reads the results back through segment 4.
-    */
-    // The same map upstream spells absolutely as MULTIBUS_PAGING_START/END; keep both in step when rebasing.
+    // The IP2 maps its RAM onto the backplane; upstream spells the same region absolutely as MULTIBUS_PAGING_START/END, so keep both in step.
     #define MULTIBUS_SLAVE_WINDOW_END       0x0FFFFF
     #define MULTIBUS_SLAVE_MAP_START        0x100000
     #define MULTIBUS_SLAVE_MAP_END          0x1FFFFF

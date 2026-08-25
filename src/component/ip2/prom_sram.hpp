@@ -72,12 +72,7 @@ namespace Motion
             return (sram[addr]); 
         }
 
-        /*
-            Byte at a time, big endian, at the address given - see the note in memory.cpp. Read32 had
-            a second bug on top of that one: it swapped into a uint16_t, truncating the result, and
-            then returned the *unswapped* word anyway, so every 32 bit read of the SRAM came back
-            little endian.
-        */
+        // Byte at a time, big endian, at the address given - see the note in memory.cpp.
         uint16_t Read16(size_t addr) override 
         { 
             addr %= (size_t)SRAM_SIZE;

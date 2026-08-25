@@ -69,21 +69,10 @@ namespace Motion
             static void AddMapping(AddrSpaceMapping mapping);
             static AddrSpaceMapping* GetMapping(size_t addr);
 
-            /*
-                An MMU can detect a fault, but it can't raise the exception: only the CPU core knows how to
-                build the stack frame for one. So a failed translation is recorded here, and whoever made
-                the access decides what to do with it. The CPU turns it into a bus error; the debugger and
-                anything else reading memory behind the machine's back can just ignore it.
-            */
-            /// @brief Faults are ignored until the CPU is out of reset - the reset vector fetch precedes every device mapping itself.
+            /// @brief Ignored until the CPU is out of reset: the reset vector fetch precedes every device mapping itself.
             static void SetFaultsEnabled(bool enabled) { faultsEnabled = enabled; };
 
-            /*
-                Bring-up instrumentation. An unmapped access is nearly always a pointer that was
-                corrupted somewhere upstream, and the only way to find upstream is to see who was
-                executing at the time. The CPU installs a hook here because AddrSpace cannot include
-                the CPU headers without a cycle.
-            */
+            // Bring-up instrumentation.
             inline static void (*unmappedHook)(size_t addr, bool isWrite, int32_t width) = nullptr;
             /// @brief Report an access that landed in a hole, rate limited.
             static void LogUnmapped(const char* what, size_t addr, bool isWrite, uint32_t value);
@@ -94,12 +83,7 @@ namespace Motion
                     unmappedHook(addr, isWrite, width);
             }
 
-            /*
-                A read made on behalf of the debugger is not a bus cycle. Disassembling whatever the
-                PC happens to point at, or drawing the stack window, must not record a fault - the
-                CPU would then raise a bus error for an access the emulated machine never made, and
-                because those reads happen outside the execute loop there is nothing to catch it.
-            */
+            // A read made on behalf of the debugger is not a bus cycle.
             static void PushPeek() { peekDepth++; };
             static void PopPeek() { if (peekDepth) peekDepth--; };
 
@@ -126,17 +110,7 @@ namespace Motion
             /// @brief Whether a failed translation should be recorded at all. Set once at startup.
             inline static bool faultsEnabled = false;
 
-            /*
-                Thread local, and it matters. These are a handshake between one memory access and the
-                code right after it that turns a failed translation into an exception, so they belong
-                to whoever is making the access - and the emulation thread is not the only one making
-                them. The debugger disassembles around the PC from the render thread every frame,
-                inside an AddrSpacePeek, and with a shared peekDepth that window suppressed faults on
-                the *emulation* thread: SignalFault returned early, the CPU read 0xFF instead of
-                taking a bus error, and carried on into whatever that decoded as. It showed up as a
-                boot that died with an illegal instruction roughly one run in four, because it
-                depended on a debugger frame happening to overlap a page fault.
-            */
+            // Thread local, and it matters.
             inline static thread_local bool faultPending = false;
             inline static thread_local size_t faultAddress = 0;
             inline static thread_local bool faultWasWrite = false;

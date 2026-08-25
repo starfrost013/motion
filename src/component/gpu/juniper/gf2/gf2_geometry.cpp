@@ -1,32 +1,11 @@
-/*
-    m  o  t  i  o  n
-    The SGI Emulator
-
-    Copyright (c)2026 starfrost
-
-    gf2_geometry.cpp: the geometry pipe, and the drawing it feeds.
-
-    Fourteen chips deep on the real board: one converting IEEE 754 to 20.8 fixed point, four making a
-    4x4 matrix multiplier, six clipping and z-buffering, two scaling, one converting back. What that
-    adds up to for a vertex is the ordinary transform - matrix, perspective divide, viewport - and
-    that is what this does, because the arithmetic is what the guest can observe, not the pipelining.
-
-    The one measurement worth keeping: IRIX clears the screen with a rectangle at (0,0)-(1023,767)
-    sent through an ortho matrix of 2/1024 and 2/768 and a viewport whose centre and half size are
-    both 512.0 and 384.0. Those cancel, so the vertices have to come out of this file as the same
-    (0,0)-(1023,767) they went in as. If a change here breaks that, the screen clear moves.
-*/
+/* motion - The SGI Emulator. Copyright (c)2026 starfrost. gf2_geometry.cpp: the geometry pipe, and the drawing it feeds. */
 
 #include <component/gpu/juniper/gf2/gf2.hpp>
 #include <cmath>
 
 namespace Motion
 {
-    /*
-        Pull the operands of the command being executed into a homogeneous vertex. The format is in
-        the opcode: two, three or four components, each a short, a long or a float. A 2D vertex is
-        given z = 0, and anything short of four components gets w = 1.
-    */
+    // Pull the operands of the command being executed into a homogeneous vertex.
     void GF2::ReadVertex(float* out)
     {
         int32_t dimension;
@@ -66,16 +45,7 @@ namespace Motion
         }
     }
 
-    /*
-        One row of the matrix being concatenated, in the same operand format a vertex uses. Anything
-        not supplied - a row never sent at all, or a component past the end of a two or three
-        component form - keeps its value from the identity matrix, which is what makes im_do_scale2's
-        two component row 0 come out as (x, 0, 0, 0) rather than (x, 0, ?, ?).
-
-        The GE's matrices multiply a row vector on the left, and the ones in this file are the
-        transpose of that, because im_do_loadmatrixtrans hands them over transposed and everything
-        here treats a vertex as a column vector. So a row of theirs is a column of ours.
-    */
+    // One row of the matrix being concatenated, in the same operand format a vertex uses.
     void GF2::ReadMatrixRow(int32_t row)
     {
         int32_t dimension;
@@ -125,11 +95,7 @@ namespace Motion
             concatMatrix[i] = ((i % 5) == 0) ? 1.0f : 0.0f;
     }
 
-    /*
-        Multiply the collected matrix onto the top of the stack. It goes on the right, so it is
-        applied to the vertex first and the matrix already there second - which is what makes a
-        translate move the world the drawing is about to be described in rather than move the camera.
-    */
+    // Multiply the collected matrix onto the top of the stack.
     void GF2::ConcatenateMatrix()
     {
         float* m = matrix[matrixTop];
@@ -151,10 +117,7 @@ namespace Motion
         memcpy(m, out, sizeof(out));
     }
 
-    /*
-        Matrix, divide, viewport. The matrix is transposed on the way in, so the vertex is a column
-        vector and the translation is the fourth column.
-    */
+    // Matrix, divide, viewport.
     void GF2::TransformVertex(const float* in, float* screenX, float* screenY)
     {
         const float* m = matrix[matrixTop];
@@ -175,11 +138,7 @@ namespace Motion
         float deviceX = clip[0] / w;
         float deviceY = clip[1] / w;
 
-        /*
-            Without a viewport there is nothing to scale by, and multiplying by zero would collapse
-            every vertex onto one point. Falling back to the whole screen keeps a stream that draws
-            before loading a viewport visible instead of silently empty.
-        */
+        // Without a viewport there is nothing to scale by, and multiplying by zero would collapse every vertex onto one point.
         if (!viewportLoaded)
         {
             *screenX = (deviceX + 1.0f) * 0.5f * (float)(GF2_SCREEN_MAX_X + 1);
@@ -207,12 +166,7 @@ namespace Motion
         polygonVertices++;
     }
 
-    /*
-        One pixel, through the write mask. The mask is per bitplane and the frame buffer is modelled
-        as 32 planes wide, so a plane the mask leaves clear keeps whatever was already there - that
-        is the whole point of it, and it is how the textport draws text without disturbing the
-        overlay planes.
-    */
+    // One pixel, through the write mask.
     void GF2::DrawPixel(int32_t x, int32_t y)
     {
         DrawPixel(x, y, fbcColour, fbcWriteMask);
@@ -234,11 +188,7 @@ namespace Motion
         vram->Write32(address, written);
     }
 
-    /*
-        FBCselectcursor: a glyph address in the font RAM, then the mode, the config register, the
-        colour and the write enable, each a long. The address is absolute - it does not go through
-        FBCbaseaddress the way a character's does.
-    */
+    // FBCselectcursor: a glyph address in the font RAM, then the mode, the config register, the colour and the write enable, each a long.
     void GF2::SelectCursor(const uint16_t* words, int32_t available)
     {
         if (available < 8)
@@ -260,11 +210,7 @@ namespace Motion
         if (wasDrawn)
             DrawCursor(wasX, wasY);
 
-        /*
-            The glyph goes in the trace because a cursor drawn in the wrong place and a cursor whose
-            bitmap is wrong look identical on a screen and completely different here. Only when it
-            changes: the retrace handler moves the cursor sixty times a second.
-        */
+        // The glyph goes in the trace because a cursor drawn in the wrong place and a cursor whose bitmap is wrong look identical on a screen and completely.
         if (logEnabled && changed)
         {
             std::string glyph;
@@ -277,11 +223,7 @@ namespace Motion
         }
     }
 
-    /*
-        Put the cursor on the screen, remembering what it covers so it can be taken off again. The
-        driver undraws before it draws anything else, so the saved pixels are only ever stale if the
-        guest breaks its own rule.
-    */
+    // Put the cursor on the screen, remembering what it covers so it can be taken off again.
     void GF2::DrawCursor(int32_t x, int32_t y)
     {
         if (!vram)
@@ -292,13 +234,7 @@ namespace Motion
         cursorX = x;
         cursorY = y;
 
-        /*
-            Only the planes the cursor is allowed to write are saved, and only those are put back.
-            mex puts its pointer in the overlay - it selects a write mask of 0xc00, planes ten and
-            eleven - precisely so the cursor can sit on top of the picture without disturbing it, and
-            it therefore does not undraw before repainting a window underneath. Saving the whole
-            pixel would make putting the cursor back revert that repaint.
-        */
+        // Only the planes the cursor is allowed to write are saved, and only those are put back.
         cursorDrawnMask = cursorWriteMask;
 
         if (cursorTrace && cursorTraced < GF2_MAX_CURSOR_LOGGED)
@@ -369,12 +305,7 @@ namespace Motion
         cursorDrawn = false;
     }
 
-    /*
-        The retrace handler's route: it moves the cursor sixty times a second without putting a
-        command through the pipe at all, so this is called from a plain register write rather than
-        from the command stream. Doing nothing when it has not moved keeps the frame buffer still
-        while the mouse is still.
-    */
+    // The retrace handler's route: it moves the cursor sixty times a second without putting a command through the pipe at all, so this is called from a.
     void GF2::MoveCursor(int32_t x, int32_t y)
     {
         if (cursorDrawn && x == cursorX && y == cursorY)
@@ -391,15 +322,7 @@ namespace Motion
             DrawCursor(x, y);
     }
 
-    /*
-        One character out of the font RAM. The descriptor says where the glyph is and how big it is;
-        the glyph is one word per row with the leftmost pixel in the top bit.
-
-        Row 0 of a glyph is its bottom, not its top: the font is stored the way GL addresses the
-        screen, with y increasing upwards, so the words go up from the character position. Drawing
-        them the other way round renders every line of text mirrored about its own baseline, which
-        is legible enough in a memory dump to look correct until you notice which way it reads.
-    */
+    // One character out of the font RAM. The descriptor says where the glyph is and how big it is; the glyph is one word per row with the leftmost pixel in.
     void GF2::DrawCharacter(const uint16_t* descriptor)
     {
         int32_t offset = descriptor[0];
@@ -431,14 +354,7 @@ namespace Motion
         charPositionX += (float)advance;
     }
 
-    /*
-        Scan convert the polygon. Everything the textport draws is a rectangle, but taking the
-        general case costs little and is what GEdrawpoly actually means: for each scanline, find
-        where the edges cross it, sort the crossings and fill between pairs.
-
-        The half-integer sample point is what makes a rectangle from (0,0) to (1023,767) come out as
-        exactly 1024 by 768 pixels rather than one short or one over on each axis.
-    */
+    // Scan convert the polygon.
     void GF2::FillPolygon()
     {
         if (polygonVertices < 3)
@@ -472,12 +388,7 @@ namespace Motion
                 LogChannels::Warning);
         }
 
-        /*
-            The pipe hands over vertices at pixel centres rather than at the corners of an area -
-            which is why the screen clear arrives as 0.5 to 1023.5 and not as 0 to 1024 - so a span
-            covers every pixel whose centre lies in the closed interval, both ends included. That is
-            already what the x loop below does, and the row range has to agree with it.
-        */
+        // The pipe hands over vertices at pixel centres rather than at the corners of an area - which is why the screen clear arrives as 0.5 to 1023.5 and not.
         int32_t firstRow = (int32_t)ceilf(lowest - 0.5f);
         int32_t lastRow = (int32_t)floorf(highest - 0.5f);
 
@@ -488,13 +399,7 @@ namespace Motion
         {
             float sampleY = (float)y + 0.5f;
 
-            /*
-                The top row's centre sits exactly on the top edge, and a scanline lying along a
-                horizontal edge crosses nothing, so it would drop out. Sample it from just inside
-                instead. The cost of getting this wrong is not one stray pixel: the textport draws
-                its rows as rectangles that abut fifteen pixels apart, so the missing row appears as
-                a rule under every line of text, and the screen clear leaves the top row unpainted.
-            */
+            // The top row's centre sits exactly on the top edge, and a scanline lying along a horizontal edge crosses nothing, so it would drop out.
             if (sampleY >= highest)
                 sampleY = highest - GF2_FILL_EPSILON;
             float crossings[GF2_GE_MAX_POLYGON_VERTICES];
@@ -533,11 +438,7 @@ namespace Motion
 
             for (int32_t i = 0; i + 1 < found; i += 2)
             {
-                /*
-                    A pixel belongs to the span when its centre, at x + 0.5, falls inside it. The
-                    screen clear arrives as 0.5 to 1023.5, so this is what makes it cover column 0
-                    and column 1023 and nothing outside them.
-                */
+                // A pixel belongs to the span when its centre, at x + 0.5, falls inside it.
                 int32_t from = (int32_t)ceilf(crossings[i] - 0.5f);
                 int32_t to = (int32_t)floorf(crossings[i + 1] - 0.5f);
 

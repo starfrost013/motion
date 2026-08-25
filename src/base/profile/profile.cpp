@@ -151,11 +151,7 @@ namespace Motion
         if (!image)
             return;
 
-        /*
-            The one way an overlay survives the process. It is off by default because throwing the
-            writes away is the entire point of the mode - this is for the boot where you meant it,
-            like an /etc/fsck repair you want to keep.
-        */
+        // The one way an overlay survives the process.
         if (image->GetMode() == DiskWriteMode::Overlay
         && diskCommitOnExit->GetValue()
         && image->GetDirtySectorCount())

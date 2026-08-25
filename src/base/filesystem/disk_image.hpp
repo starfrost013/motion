@@ -1,11 +1,4 @@
-/*
-    m  o  t  i  o  n
-    The SGI Emulator
-
-    Copyright (c)2026 starfrost
-
-    disk_image.hpp: A disk image, written through (Direct), copy on write (Overlay) or not at all (ReadOnly)
-*/
+/* motion - The SGI Emulator. Copyright (c)2026 starfrost. disk_image.hpp: A disk image, written through (Direct), copy on write (Overlay) or not at all (ReadOnly) */
 
 #pragma once
 #include <Motion.hpp>

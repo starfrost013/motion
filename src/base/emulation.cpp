@@ -68,12 +68,7 @@ namespace Motion
         emuThread = new std::thread(Emulation::Tick);
     }
     
-    /*
-        dumpOnConsoleMatch catches the machine at a moment the guest announces. Plenty of the
-        interesting ones it never mentions - a boot that simply goes quiet says nothing to match on -
-        so this is the same idea on a stopwatch. Frame() rather than Tick() because this wants wall
-        clock, and Tick() runs flat out.
-    */
+    // dumpOnConsoleMatch catches the machine at a moment the guest announces.
     int64_t Emulation::SecondsSinceStart()
     {
         static const auto start = std::chrono::steady_clock::now();
@@ -99,17 +94,7 @@ namespace Motion
         CoherentEditor::DumpAll(std::format("{} seconds elapsed", after).c_str());
     }
 
-    /*
-        Anything the guest only does in response to being typed at - a getty login, a shell, fsck
-        asking whether to repair - is out of reach of a scripted run without this. consoleInput is
-        typed at the console line starting consoleInputAfterSeconds in, which is late enough to let
-        the kernel finish booting and userland open the line.
-
-        \n, \r, \t, \\ and \xNN are understood, so a newline or a DEL survives a command line that
-        would otherwise eat them. \pN waits N seconds before sending the rest, which is what makes
-        a conversation possible: the answer to one prompt usually has to land before the next
-        question is even asked.
-    */
+    // Anything the guest only does in response to being typed at - a getty login, a shell, fsck asking whether to repair - is out of reach of a scripted.
     void Emulation::CheckConsoleInput()
     {
         if (!consoleInput)

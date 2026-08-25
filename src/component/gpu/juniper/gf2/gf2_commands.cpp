@@ -1,38 +1,10 @@
-/*
-    m  o  t  i  o  n
-    The SGI Emulator
-
-    Copyright (c)2026 starfrost
-
-    gf2_commands.cpp: the segment 6 command stream.
-
-    Everything the host draws arrives as 16 bit words pushed at one address. The geometry pipe reads
-    them as its own instruction set, except for the words wrapped in a GEpassthru, which it hands
-    straight to the frame buffer controller. Splitting the two apart is the whole job of this file:
-    the GE side needs a transform pipeline that does not exist yet, but the FBC side is where the
-    drawing happens, and some of it - the scratch RAM tables, the pixel readback - has to answer
-    correctly before IRIX will even finish bringing the board up.
-
-    The framing rules are in gf2.hpp. The one that is easy to get wrong: a passthru body can hold
-    more than one FBC command, so it is parsed with a parameter count per opcode rather than being
-    treated as a single command with n-1 arguments.
-*/
+/* motion - The SGI Emulator. Copyright (c)2026 starfrost. gf2_commands.cpp: the segment 6 command stream. */
 
 #include <component/gpu/juniper/gf2/gf2.hpp>
 
 namespace Motion
 {
-    /*
-        How many words each FBC opcode takes after itself. Derived from the im_passcmd(n, FBCxxx)
-        call sites in the GL2 sources, where n counts the opcode, so the count here is n - 1. Where a
-        macro appears with more than one n the smallest is the real one and the larger ones are
-        groups holding several commands.
-
-        GF2_FBC_PARAMS_UNKNOWN marks an opcode whose length this does not know. Hitting one means the
-        rest of the body cannot be trusted, so the parser stops there rather than resynchronising
-        onto data, which would turn a gap in this table into wrong drawing rather than a clear
-        message.
-    */
+    // How many words each FBC opcode takes after itself.
     int32_t GF2::FBCParamCount(uint16_t opcode)
     {
         switch (opcode & 0xFF)
@@ -89,11 +61,7 @@ namespace Motion
         }
     }
 
-    /*
-        gl_getplaneinfo writes one pixel with the colour and the write mask both all ones and reads
-        it back, so the honest answer is whatever the fitted bitplanes can hold. Asking BP3 rather
-        than returning a constant means +set numBitplanes actually changes what IRIX believes.
-    */
+    // gl_getplaneinfo writes one pixel with the colour and the write mask both all ones and reads it back, so the honest answer is whatever the fitted.
     uint32_t GF2::GetInstalledPlaneMask()
     {
         BP3* bp3 = (BP3*)vram;
@@ -101,11 +69,7 @@ namespace Motion
         return bp3 ? bp3->GetPlaneMask() : 0;
     }
 
-    /*
-        Say that a result is waiting. The host is either spinning on INTERRUPT_BIT_ or taking the
-        interrupt; either way it then reads the code back under READOUTRUN to find out what kind of
-        answer this is, and drains the data from the readback FIFO in RUNMODE.
-    */
+    // Say that a result is waiting.
     void GF2::RaiseProgrammedInterrupt(uint16_t code, const uint16_t* data, int32_t count)
     {
         if (count > GF2_FBC_READBACK_MAX)
@@ -127,10 +91,7 @@ namespace Motion
         UpdateInterrupt();
     }
 
-    /*
-        FBCclrint, and every read when AUTOCLEAR is set, takes one word off the front. The interrupt
-        stays asserted until the host has drained everything the microcode left for it.
-    */
+    // FBCclrint, and every read when AUTOCLEAR is set, takes one word off the front.
     uint16_t GF2::PopReadback()
     {
         if (readbackCount <= 0)
@@ -156,10 +117,7 @@ namespace Motion
         return word;
     }
 
-    /*
-        Start capturing. Two words are reserved at the front for the token the host throws away and
-        the word count it checks, neither of which is known until the end markers arrive.
-    */
+    // Start capturing.
     void GF2::BeginFeedback()
     {
         feedbackMode = true;
@@ -176,12 +134,7 @@ namespace Motion
         feedback[feedbackLength++] = word;
     }
 
-    /*
-        GEstoremm in feedback mode. struct matdata is a short the driver comments as "GEstoremm
-        command" and then a Matrix, so it is the opcode as a token followed by sixteen floats, high
-        half of each first - the same order GEloadmm reads them back in, which is what makes
-        restoreeverything's replay of the saved blob a round trip rather than a reinterpretation.
-    */
+    // GEstoremm in feedback mode.
     void GF2::StoreMatrixToFeedback()
     {
         AppendFeedback(geOpcode);
@@ -197,10 +150,7 @@ namespace Motion
         }
     }
 
-    /*
-        The end markers have arrived, so fill in the word count and hand the buffer over. The count
-        covers everything after itself, the three markers included.
-    */
+    // The end markers have arrived, so fill in the word count and hand the buffer over.
     void GF2::EndFeedback()
     {
         feedbackMode = false;
@@ -213,11 +163,7 @@ namespace Motion
         RaiseProgrammedInterrupt(GF2_FBC_INT_FEEDBACK, feedback, feedbackLength);
     }
 
-    /*
-        Execute one FBC command out of a passthru body. Returns how many words it consumed, so the
-        caller can carry on with whatever follows it in the same body, or 0 to say the body cannot be
-        parsed any further.
-    */
+    // Execute one FBC command out of a passthru body.
     int32_t GF2::ExecuteFBCCommand(const uint16_t* words, int32_t available)
     {
         uint16_t opcode = words[0] & 0xFF;
@@ -240,12 +186,7 @@ namespace Motion
         {
             case GF2_FBC_OP_LOADRAM:
             {
-                /*
-                    The scratch RAM tables: the swizzle table at 0x700, the mask table just below it
-                    and the divide table at 0x800. The microcode indexes these, so they have to be
-                    kept even though nothing reads them back - write_scratch() sends them in blocks
-                    of 120 words, and a block that lands in the wrong place would be silent.
-                */
+                // The scratch RAM tables: the swizzle table at 0x700, the mask table just below it and the divide table at 0x800.
                 if (available < 3)
                     return 0;
 
@@ -276,28 +217,11 @@ namespace Motion
 
             case GF2_FBC_OP_LOADMASKS:
             {
-                /*
-                    The font RAM: the default stipple pattern at 0, the cursor at 16 and the console
-                    font from 32 up. There is no count word - the passthru length said how much, so
-                    everything after the address belongs to this command. The textport cannot draw a
-                    character that was never loaded, so this has to be kept even though the drawing
-                    that reads it is not written yet.
-                */
+                // The font RAM: the default stipple pattern at 0, the cursor at 16 and the console font from 32 up.
                 if (available < 2)
                     return 0;
 
-                /*
-                    Relative to the base, which is the whole point of there being one: mex loads
-                    thirteen cursor glyphs at 0, 16, 32 and so on up to 192, and then selects one by
-                    its *absolute* address, 2224. That only lines up if the base was 2048 when the
-                    glyphs went in - gl_fontslot() gave mex that slot, and the kernel adds the base
-                    itself for the cursor because the microcode takes that one address absolute.
-
-                    Ignoring the base put every one of mex's glyphs 2048 words too low, so selecting
-                    2224 read font RAM nobody had written and selecting 16 - which is where the
-                    kernel's arrow lives - got mex's second cursor instead. The pointer was drawn in
-                    the right place, in the right colour, out of the wrong bitmap.
-                */
+                // Relative to the base, which is the whole point of there being one: mex loads thirteen cursor glyphs at 0, 16, 32 and so on up to 192, and then.
                 int32_t addr = fontRamBase + words[1];
                 int32_t count = available - 2;
 
@@ -322,23 +246,14 @@ namespace Motion
                 return 1 + params;
 
             case GF2_FBC_OP_WRTEN:
-                /*
-                    The write enable mask, one bit per bitplane. IRIX works out what to put here from
-                    the pixel readback, so with twelve usable planes out of thirty two fitted it
-                    sends 0x0fff - which is a direct check that the readback answered correctly.
-                */
+                // The write enable mask, one bit per bitplane.
                 if (available > 1)
                     fbcWriteMask = words[1];
 
                 return 1 + params;
 
             case GF2_FBC_OP_CHARPOSNABS:
-                /*
-                    Two forms. im_cmov2i sends this on its own and then pushes a GEpoint through the
-                    pipe, so the position arrives transformed one command later - that is the form
-                    the textport uses for every line it draws. gl_getplaneinfo instead passes the
-                    point straight through as three more words, already in screen coordinates.
-                */
+                // Two forms.
                 if (available >= 4)
                 {
                     charPositionX = (float)(int16_t)words[2];
@@ -354,10 +269,7 @@ namespace Motion
 
             case GF2_FBC_OP_DRAWCHARS:
             {
-                /*
-                    A whole string, four words per character, as many as fit in one passthru -
-                    xcharstr sends thirty at a time and starts another command for the rest.
-                */
+                // A whole string, four words per character, as many as fit in one passthru - xcharstr sends thirty at a time and starts another command for the rest.
                 int32_t count = (available - 1) / GF2_FBC_CHAR_WORDS;
 
                 for (int32_t i = 0; i < count; i++)
@@ -371,25 +283,11 @@ namespace Motion
             }
 
             case GF2_FBC_OP_FORCECOMPLETION:
-                /*
-                    Not a command the guest means anything by. The kernel's gl_WaitForEOF has no EOF
-                    interrupt to wait on - unlike the user space one it never sends FBCeof - so it
-                    waits by filling the pipe instead, pushing seventy six copies of the long
-                    0x00080008 and reasoning that "pipe only holds about 140 goobies, when all these
-                    passthrus have been stuffed down the pipe, eof must have been reached". Each of
-                    those longs is a one word passthru whose body is GEpassthru itself.
-
-                    Named here so it does not come out of the log as four thousand unimplemented
-                    commands a boot, which is what sent this session looking for a parser bug.
-                */
+                // Not a command the guest means anything by.
                 return 1 + params;
 
             case GF2_FBC_OP_BASEADDRESS:
-                /*
-                    Where this client's slice of the font RAM starts. gl_fontslot() hands every GL
-                    process a 256 word aligned slot and the FBC adds the base to what it is given, so
-                    two programs can each load a font at "0" without treading on each other.
-                */
+                // Where this client's slice of the font RAM starts.
                 if (available > 1)
                     fontRamBase = words[1];
 
@@ -414,10 +312,7 @@ namespace Motion
                 return 1 + params;
 
             case GF2_FBC_OP_FEEDBACK:
-                /*
-                    Stop drawing and start capturing. Everything the geometry side produces from here
-                    goes into the feedback buffer until the three end markers arrive.
-                */
+                // Stop drawing and start capturing.
                 BeginFeedback();
 
                 if (logEnabled)
@@ -427,13 +322,7 @@ namespace Motion
 
             case GF2_FBC_OP_READCHARPOSN:
             {
-                /*
-                    Where the next character would go. restoreeverything() reads this out so it can
-                    put it back, and the third word is the valid flag: -1 means "good character
-                    position" and anything else makes the restore send a bare FBCcharposnabs and
-                    leave the position alone. There is no word count in front of this one - the
-                    driver knows there are three words and reads exactly three.
-                */
+                // Where the next character would go.
                 uint16_t answer[4] =
                 {
                     GF2_FBC_OP_READCHARPOSN,
@@ -449,18 +338,7 @@ namespace Motion
 
             case GF2_FBC_OP_EOF:
             {
-                /*
-                    The end of a batch of work, and the handshake every GL program waits on. The host
-                    locks the pipe, increments EOFpending in its shared memory, and sends this; the
-                    microcode raises _INTEOF when it comes out the far end, and the kernel's
-                    fbc_progintr() pops two words and decrements the count, which is what releases
-
-                        while (sh->EOFpending & EOFPENDINGBITS) ;
-
-                    in gl_WaitForEOF. Without the interrupt that loop never ends: mex spins there
-                    forever at 100% CPU having drawn nothing, which looks like a hang in the geometry
-                    engine and is really just an unanswered acknowledgement.
-                */
+                // The end of a batch of work, and the handshake every GL program waits on.
                 uint16_t answer[2] = { GF2_FBC_OP_EOF, 0 };
 
                 RaiseProgrammedInterrupt(GF2_FBC_INT_EOF, answer, 2);
@@ -470,17 +348,7 @@ namespace Motion
 
             case GF2_FBC_OP_READPIXELS:
             {
-                /*
-                    Read pixels back to the host. The only caller that matters during bring-up is
-                    gl_getplaneinfo, which writes a single all-ones pixel and reads it back to find
-                    out which bitplanes exist.
-
-                    What it expects to find, in order: the command, the word count, then the pixel as
-                    two 16 bit halves, C/D planes first and A/B second - it reassembles them as
-                    (cd << 16) | ab. The first two are popped and thrown away, so only their presence
-                    matters, but the interrupt code does not: reading anything other than _INTPIXEL32
-                    there is a panic.
-                */
+                // Read pixels back to the host.
                 uint32_t planes = GetInstalledPlaneMask();
 
                 uint16_t answer[4] =
@@ -497,11 +365,7 @@ namespace Motion
             }
 
             default:
-                /*
-                    Everything else is understood well enough to be stepped over but not yet to be
-                    carried out. Stepping over it correctly is what keeps the commands that do work
-                    aligned, so this is not the same as ignoring the stream.
-                */
+                // Everything else is understood well enough to be stepped over but not yet to be carried out.
                 if (logEnabled)
                 {
                     std::string args;
@@ -536,11 +400,7 @@ namespace Motion
         geBodyLength = 0;
     }
 
-    /*
-        One word into the pipe. The address decides whether this is the last word of a command (the
-        GE port token) but not what the word means - that is entirely positional, which is why the
-        passthru counter has to be kept across writes rather than worked out per access.
-    */
+    // One word into the pipe.
     void GF2::PushGEWord(uint16_t word, bool last)
     {
         if (gePassthruLeft > 0)
@@ -556,12 +416,7 @@ namespace Motion
             return;
         }
 
-        /*
-            Operands first. A word only means an opcode when nothing is waiting for it, and a
-            coordinate is free to look like anything: the textport draws a rectangle at x = 8, whose
-            low byte is GEpassthru, so testing for a passthru header before this drops the rest of
-            that rectangle and resynchronises the parser onto the middle of a command.
-        */
+        // Operands first.
         if (geOperandsLeft > 0)
         {
             if (geOperandCount < (int32_t)(sizeof(geOperands) / sizeof(geOperands[0])))
@@ -575,11 +430,7 @@ namespace Motion
             return;
         }
 
-        /*
-            A configuration byte per geometry chip, the chip number in the high byte counting down,
-            ending at the first word whose high byte is 0xff - which gl_justconfigure writes as
-            im_passthru(0) and the inline versions in gr.c write as a last config value.
-        */
+        // A configuration byte per geometry chip, the chip number in the high byte counting down, ending at the first word whose high byte is 0xff - which.
         if (geReconfiguring)
         {
             if ((word & 0xFF00) == 0xFF00)
@@ -588,12 +439,7 @@ namespace Motion
             return;
         }
 
-        /*
-            The three end markers, before anything else looks at the word: FBCEOF1 is 0x0108, which
-            is a well formed two word passthru header, so testing for a passthru first would swallow
-            the other two markers as an FBC command body and leave the feedback buffer unfinished -
-            and the host spinning on an interrupt that never comes.
-        */
+        // The three end markers, before anything else looks at the word: FBCEOF1 is 0x0108, which is a well formed two word passthru header, so testing for a.
         if (feedbackMode)
         {
             if (geEofWordsLeft > 0)
@@ -616,11 +462,7 @@ namespace Motion
 
         if ((word & 0xFF) == GF2_GE_OP_PASSTHRU)
         {
-            /*
-                im_passthru(0) encodes as 0xFF08 because (0 - 1) << 8 wraps into the high byte. It
-                locks the pipe when written to GEPORT and frees it when written to LASTGE, and either
-                way it opens no body - reading it as a 256 word one swallows everything after it.
-            */
+            // im_passthru(0) encodes as 0xFF08 because (0 - 1) << 8 wraps into the high byte.
             if (word == GF2_GE_PASSTHRU_FREE)
                 return;
 
@@ -638,14 +480,7 @@ namespace Motion
             ExecuteGECommand();
     }
 
-    /*
-        How many operand words a geometry command takes. The opcode is the low byte and the operand
-        format is packed into bits 8-11: a dimension of 2, 3 or 4, and a type of short, long integer
-        or float. Only the drawing and matrix commands carry operands - the rest are bare opcodes.
-
-        This is what makes the stream self describing, and it is why the GE side can be framed
-        correctly long before anything is able to carry the commands out.
-    */
+    // How many operand words a geometry command takes.
     int32_t GF2::GEParamCount(uint16_t word)
     {
         switch (word & 0xFF)
@@ -680,15 +515,7 @@ namespace Motion
         }
     }
 
-    /*
-        A complete geometry command. Carrying these out means the transform pipeline the fourteen GE
-        chips implement - the matrix stack, the viewport, clipping - feeding transformed vertices to
-        the frame buffer controller, and none of that exists yet.
-
-        The textport is the reason to build it: it draws its background and its cursor as filled
-        polygons and positions every character with a transformed point, so text on the screen goes
-        through here rather than through the passthru side.
-    */
+    // A complete geometry command.
     void GF2::ExecuteGECommand()
     {
         if (logEnabled)
@@ -698,10 +525,7 @@ namespace Motion
         switch (geOpcode & 0xFF)
         {
             case GF2_GE_OP_LOADMM:
-                /*
-                    Sixteen floats, transposed. They replace the top of the stack rather than being
-                    concatenated onto it, which is what makes this loadmatrix and not multmatrix.
-                */
+                // Sixteen floats, transposed.
                 for (int32_t i = 0; i < 16 && (i * 2 + 1) < geOperandCount; i++)
                 {
                     uint32_t bits = ((uint32_t)geOperands[i * 2] << 16) | geOperands[i * 2 + 1];
@@ -724,11 +548,7 @@ namespace Motion
                 break;
 
             case GF2_GE_OP_STOREMM:
-                /*
-                    Hand the top of the matrix stack back to the host. Outside feedback mode there is
-                    nowhere for it to go - the controller is drawing, not capturing - so this is the
-                    one command whose meaning depends on what the FBC was told beforehand.
-                */
+                // Hand the top of the matrix stack back to the host.
                 if (feedbackMode)
                     StoreMatrixToFeedback();
                 break;
@@ -740,13 +560,7 @@ namespace Motion
 
             case GF2_GE_OP_CONCAT_FIRST ... GF2_GE_OP_CONCAT_LAST:
             {
-                /*
-                    A row of a matrix to concatenate onto the top of the stack. Which row is the low
-                    two bits; whether this row opens the matrix, closes it, or does both is the two
-                    above them. Everything that moves the world other than loadmatrix arrives here,
-                    including the single GEcompletemm3 mex sends to put a window's textport where the
-                    window is instead of at the screen origin.
-                */
+                // A row of a matrix to concatenate onto the top of the stack.
                 int32_t row = (geOpcode & GF2_GE_CONCAT_ROW_MASK);
                 int32_t kind = ((geOpcode & 0xFF) >> GF2_GE_CONCAT_KIND_SHIFT) & 0x03;
 
@@ -763,10 +577,7 @@ namespace Motion
 
             case GF2_GE_OP_LOADVIEWPORT:
             {
-                /*
-                    Eight longs in 20.8 fixed point: centre x, centre y, half size x, half size y,
-                    then the near and far pairs this does not need until there is a z buffer.
-                */
+                // Eight longs in 20.8 fixed point: centre x, centre y, half size x, half size y, then the near and far pairs this does not need until there is a z.
                 if (geOperandCount < 8)
                     break;
 
@@ -790,10 +601,7 @@ namespace Motion
 
             case GF2_GE_OP_POINT:
             {
-                /*
-                    A transformed point. The textport only sends one to say where the next string
-                    goes, which is why this feeds the character position rather than drawing.
-                */
+                // A transformed point.
                 float vertex[4];
 
                 ReadVertex(vertex);
@@ -824,11 +632,7 @@ namespace Motion
         geOperandCount = 0;
     }
 
-    /*
-        Operands in the format the opcode asked for, so a trace reads as coordinates rather than as
-        hex. The three types are not interchangeable: a short is one word, an integer is two, and a
-        float is two words of IEEE 754 that the first GE chip converts to 20.8 fixed point.
-    */
+    // Operands in the format the opcode asked for, so a trace reads as coordinates rather than as hex.
     std::string GF2::FormatGEOperands()
     {
         std::string out;
@@ -883,10 +687,7 @@ namespace Motion
             Logger::Log(LOG_PREFIX_GF2, "further geometry pipe writes will not be logged", LogChannels::Debug);
     }
 
-    /*
-        Everything the host draws arrives here. A long write is two words, high half first, because
-        the pipe is 16 bits wide and the FIFO order is what the parser depends on.
-    */
+    // Everything the host draws arrives here.
     void GF2::WriteGE(size_t addr, uint32_t value, int32_t width)
     {
         LogGEWord(addr, value, width);

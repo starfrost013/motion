@@ -35,11 +35,7 @@ namespace Motion
         
         const char* GetName() override { return "Video RAM (BP3 Bitplane boards)"; };
 
-        /*
-            One bit per fitted bitplane. gl_getplaneinfo works this out by writing a pixel with the
-            colour and the write mask both all ones and reading it back, so the answer the GF2 has to
-            give it is exactly this mask - no plane that is not installed can hold the bit.
-        */
+        // One bit per fitted bitplane.
         uint32_t GetPlaneMask() { return writeMask; };
 
     private:

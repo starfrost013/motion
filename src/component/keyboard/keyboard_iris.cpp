@@ -1,23 +1,4 @@
-/*
-    m  o  t  i  o  n
-    The SGI Emulator
-
-    Copyright (c)2026 starfrost
-
-    keyboard.hpp: It's the keyboard.
-    Generic keyboard interface
-
-    On IRIS and early IRIS 4D, the keyboard I/O Interface is DUART0 Channel A. So we will hook to this. But this is the generic keyboard interface.#
-    This class mostly exists so Machine::FindComponentByType can find all types of keyboards.
-
-    Technically this is an Intel 8748 but HLE will be perfectly acceptable for now, we will emulate the MCU (variant of the 8048) later.
-
-    The one thing the high level model cannot skip is that this keyboard reports both halves of a
-    keystroke. IRIX keeps shift, control and caps lock from the make and break codes alone, and drops
-    any key it cannot account for the modifier state of, so a keyboard that only ever says "down"
-    leaves the guest believing a modifier is held forever and quietly stops working. See the note in
-    keyboard_iris.hpp for the encoding.
-*/
+/* motion - The SGI Emulator. Copyright (c)2026 starfrost. keyboard_iris.cpp:  */
 
 #include <component/keyboard/keyboard_iris.hpp>
 
@@ -53,11 +34,7 @@ namespace Motion
         duart->GetLine(KEYBOARD_DUART_LINE).AddRxByte(wire);
     }
 
-    /*
-        Let go of everything. The host delivers a key-up to whoever has focus, so a key held while
-        the user switches away never comes up here - and with shift or control that is the difference
-        between a working keyboard and one that has silently stopped accepting input.
-    */
+    // Let go of everything.
     void KeyboardIris::ReleaseEverything()
     {
         for (int32_t scancode = 0; scancode < KEYBOARD_SCANCODE_COUNT; scancode++)
@@ -92,11 +69,7 @@ namespace Motion
 
             lastHostByte = transmitEvent.data;
 
-            /*
-                Answer "who are you" every time it is asked, not just the first time. Both the PROM
-                and IRIX ask, and an unanswered request leaves the driver waiting, so it takes the
-                next thing it hears - the user's first keystroke - as the reply instead.
-            */
+            // Answer "who are you" every time it is asked, not just the first time.
             if (previous == KEYBOARD_WHO_ARE_YOU_0
             && transmitEvent.data == KEYBOARD_WHO_ARE_YOU_1)
             {
@@ -147,29 +120,15 @@ namespace Motion
             if (!LookupScancode(keyDownEvent.key, scancode))
                 return;
 
-            /*
-                The host's auto-repeat is the host's. A real keyboard here would repeat at whatever
-                rate its own MCU was set to, not at the rate the user's desktop is configured for,
-                and forwarding these is what makes a single deliberate keypress arrive as two or
-                three characters whenever the emulator stalls long enough for a repeat to be
-                queued behind it.
-            */
+            // The host's auto-repeat is the host's.
             if (keyDownEvent.repeat)
                 return;
 
-            /*
-                A key going down that the guest already believes is down means its release went
-                somewhere else. Say it came up first, so the guest's idea of what is held matches
-                the user's fingers again rather than drifting further out.
-            */
+            // A key going down that the guest already believes is down means its release went somewhere else.
             if (keyDown[scancode & KEYBOARD_SCANCODE_KEY_MASK])
                 SendKey(scancode, false);
 
-            /*
-                Nothing else to do. Shift, control and caps lock are not folded in here: they are
-                keys in their own right, and IRIX derives the modifier state from their own make and
-                break codes. Setting bit 7 to mean "shifted" would mean "released" to the guest.
-            */
+            // Nothing else to do.
             SendKey(scancode, true);
         }
         else if (evt.type == EventType::KeyUp)

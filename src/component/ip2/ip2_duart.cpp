@@ -119,18 +119,7 @@ namespace Motion
                 // test mode toggle, similar in spirit to the BRG test - not meaningfully emulated beyond this
                 break;
             case DUART_READ_INPUT_PORTS:
-                /*
-                    D7 always reads 1; D6 reflects IACKN, which isn't modeled here (no interrupt
-                    acknowledge cycles yet), so it's also left high; IP0-5 are pulled up with nothing
-                    external attached.
-
-                    Except the two carrier-detect inputs, which are **active low** - see the note in
-                    the header. Both lines report carrier present, because in an emulator the terminal
-                    on the other end is always plugged in and always powered on. Answering 0xFF here
-                    meant "no carrier on every line", so du_open() blocked forever and the console
-                    getty never printed `login:` - the machine reached run level 2 and then went
-                    silent, which looked like a hang and was a modem control line.
-                */
+                // D7 always reads 1; D6 reflects IACKN, which isn't modeled here (no interrupt acknowledge cycles yet), so it's also left high; IP0-5 are pulled up.
                 ret = 0xFF & ~(DUART_IPORT_DCDA | DUART_IPORT_DCDB);
                 break;
             case DUART_READ_START_COUNTER_CMD:
@@ -479,11 +468,7 @@ namespace Motion
 
         duart.isr = isr;
 
-        /*
-            INTRN is asserted whenever an unmasked source is pending. Both chips sit on interrupt
-            level 6; which of them is asserting is what picks the vector, and DUART 1 is the one the
-            kernel installs its Xclock handler for.
-        */
+        // INTRN is asserted whenever an unmasked source is pending.
         if (!interrupts)
             interrupts = Emulation::GetMachine()->FindComponentByType<IP2Interrupt>();
 
@@ -511,11 +496,7 @@ namespace Motion
         }
     }
 
-    /*
-        Rather than decrementing once per tick - which at 230kHz would mean either a very hot Tick or
-        a counter that lies - work out where the counter must have got to from how long it has been
-        since it was loaded. Reads latch the value first, so the host always sees an exact count.
-    */
+    // Rather than decrementing once per tick - which at 230kHz would mean either a very hot Tick or a counter that lies - work out where the counter must.
     void DUART68681::UpdateCounter(int32_t duartId)
     {
         DUART& duart = duarts[duartId];
@@ -540,22 +521,14 @@ namespace Motion
         // The counter rolls over rather than stopping at zero, so this is deliberately allowed to wrap.
         duart.counter = (uint16_t)(duart.counterPreset - elapsed);
 
-        /*
-            "Counter ready" is set the first time the count passes zero and stays set until the stop
-            counter command clears it. In timer mode there is no stop, so the bit is set once a half
-            period has gone by and the host clears it the same way.
-        */
+        // "Counter ready" is set the first time the count passes zero and stays set until the stop counter command clears it.
         if (elapsed >= duart.counterPreset)
             duart.isr |= DUART_INT_COUNTER_READY;
     }
 
     void DUART68681::Tick()
     {
-        /*
-            Keep the counter/timer current. This is what generates the scheduler clock, so a change
-            here has to reach the interrupt logic rather than just sitting in ISR - run the interrupt
-            recompute whenever the counter ready bit moves.
-        */
+        // Keep the counter/timer current.
         for (int32_t duart = 0; duart < 2; duart++)
         {
             uint8_t before = duarts[duart].isr;

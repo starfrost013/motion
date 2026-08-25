@@ -40,24 +40,7 @@ namespace Motion
             Logger::SetChannelEnabled(UC4_LOG_CHANNEL_NAME);
     }
 
-    /*
-        The status bits in UCR are read only, so they are not part of what the guest wrote and have to
-        be added on the way out.
-
-        VERTICAL is the display's vertical interval, and it is reported as permanently open. On the
-        real board it is the window during which the host may write the colour map without the change
-        landing in the middle of a scanned out frame; here DC4 does not scan out at all, it blits the
-        whole of VRAM into a texture once a frame, so there is no moment at which a colour map write
-        would be visible as a tear and no reason to hold one off.
-
-        That matters because gl_domapcolors() runs inside the retrace interrupt and drains the shared
-        memory colour queue only while this bit reads set. With it clear the queue never empties, and
-        a user process calling mapcolor() enough times to fill its sixty four entries spins forever
-        waiting for room - which is where mex ends up on its way to painting the desktop.
-
-        The cost is that gsync() never blocks: it returns immediately when the interval is already
-        open, so a program pacing itself on the retrace runs as fast as the emulator will let it.
-    */
+    // The status bits in UCR are read only, so they are not part of what the guest wrote and have to be added on the way out.
     uint16_t UC4::ReadUCR()
     {
         return (uint16_t)(ucr | UC4_UCR_VERTICAL);

@@ -1,11 +1,4 @@
-/*
-    m  o  t  i  o  n
-    The SGI Emulator
-
-    Copyright (c)2026 starfrost
-
-    disk_image.cpp: see disk_image.hpp for what the three modes are for.
-*/
+/* motion - The SGI Emulator. Copyright (c)2026 starfrost. disk_image.cpp: see disk_image.hpp for what the three modes are for. */
 
 #include <base/filesystem/disk_image.hpp>
 

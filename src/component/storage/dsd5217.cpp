@@ -1,23 +1,4 @@
-/*
-    m  o  t  i  o  n
-    The SGI Emulator
-
-    Copyright (c)2026 starfrost
-
-    dsd5217.cpp: The Qualogy (previously known as Data Systems Design) DSD 5217 Multibus Disk & Tape Controller
-
-    Technically not used on the 3130 (3120) but this is the only controller that I've got a disk image for right now
-    Later on we can run mkboot and boot this
-
-    Currently this is a high-level emulation, but this uses the Intel 8085. Later on we'll write an 8085 emulation.
-
-    NOTE: Due to using an INTEL 8085, this is a LITTLE ENDIAN Peripheral, sitting behind a bus that swaps the byte
-    lanes. See the MBRead/MBWrite helpers - everything else in here works in Multibus byte offsets.
-    
-    Sources:
-    https://bitsavers.trailing-edge.com/pdf/dsd/5215_5217/040040-01_5215_Users_Guide_198404.pdf
-    https://bitsavers.trailing-edge.com/pdf/dsd/5215_5217/040069-01_5217_Users_Guide_Addendu_198404.pdf
-*/
+/* motion - The SGI Emulator. Copyright (c)2026 starfrost. dsd5217.cpp: The Qualogy (previously known as Data Systems Design) DSD 5217 Multibus Disk & Tape Controller Technically. */
 
 #include <component/storage/dsd5217.hpp>
 
@@ -33,13 +14,7 @@ namespace Motion
 
         multibus = Emulation::GetMachine()->FindComponentByType<Multibus>();
 
-        /*
-            The only thing this board decodes is its single programmed I/O port. It is a bus MASTER:
-            the wake-up block, CCB, CIB, IOPB and every data buffer are plain Multibus RAM that the
-            controller fetches for itself. Do NOT add a memory range here - a device window over the
-            control blocks is also a hole in the middle of whatever the host is DMAing through, and
-            every transfer that crosses it silently disappears.
-        */
+        // The only thing this board decodes is its single programmed I/O port.
         Multibus::SlotMapping slot = Multibus::SlotMapping(this);
         slot.ioStart = DSD5217_MBIO_START;
         slot.ioEnd = DSD5217_MBIO_END;
@@ -47,11 +22,7 @@ namespace Motion
 
         multibus->AddSlotMapping(slot);
 
-        /*
-            The two winchesters the controller supports, md0 and md1. They are the machine's two
-            physical drives - profileDisk0Path and profileDisk1Path - not two controllers; the IOPB
-            says which one every command is for.
-        */
+        // The two winchesters the controller supports, md0 and md1.
         for (int32_t i = 0; i < DSD5217_MAX_DISK_DRIVES; i++)
             drives[i].image = Profile::OpenDisk(i);
 
@@ -243,12 +214,7 @@ namespace Motion
 
             if (!tablesFetched)
             {
-                /*
-                    "The first programmed I/O start command is treated in a special way when the controller
-                    has been reset. Instead of attempting to fetch an IOPB and execute a command, the
-                    controller ... chains from the WUB to the CCB and CIB internally, saving the addresses
-                    of the latter blocks. It then clears the busy flag in the CCB without issuing status."
-                */
+                // "The first programmed I/O start command is treated in a special way when the controller has been reset.
                 if (FetchWakeUpBlock() && FetchChannelBlocks())
                 {
                     tablesFetched = true;
@@ -310,12 +276,7 @@ namespace Motion
         if (iopb.deviceCode == DSD5217_DEVICE_CODE_HDD
         && !currentDrive)
         {
-            /*
-                A command for a drive that is not fitted. Reporting "unit not ready" rather than
-                quietly succeeding is what makes md1 come out as "not installed" instead of attaching
-                as a second copy of md0, which is what happened while every command went to drive 0
-                whatever the IOPB said.
-            */
+            // A command for a drive that is not fitted.
             inist.sb[DSD5217_SB_HARD_ERROR1] |= DSD5217_HARDERR1_UNIT_NOT_READY;
             ok = false;
         }
@@ -352,12 +313,7 @@ namespace Motion
         else
             Logger::Log(DSD5217_LOG_PREFIX, std::format("Executed command 0x{:x}", iopb.function).c_str(), LogChannels::Debug);
 
-        /*
-            Winchester "immediate function complete", with the unit that ran it in bits 5:4. Commands we
-            haven't got round to still report success rather than an error - the host aborts the boot on
-            a hard error, and silently doing nothing gets further than confidently failing. The log line
-            above is the place to find out about them.
-        */
+        // Winchester "immediate function complete", with the unit that ran it in bits 5:4.
         uint8_t opStatus = DSD5217_OPERATION_STATUS_COMPLETE
             | ((iopb.unit << DSD5217_OPERATION_UNIT_SHIFT) & DSD5217_OPERATION_UNIT_BITS);
 
@@ -452,12 +408,7 @@ namespace Motion
             Logger::Log(DSD5217_LOG_PREFIX, std::format("Transfer from 0x{:x}..0x{:x} leaves the emulated 1MB multibus window and will wrap",
                 iopb.dba, iopb.dba + iopb.rbc).c_str(), LogChannels::Warning);
 
-        /*
-            Refuse to write past the end of the image rather than letting the stream extend it. A
-            disk that silently grows is worse than one that reports an error: the partition table
-            and the filesystem both describe a fixed number of blocks, so anything landing beyond
-            them is lost anyway and only makes the file no longer match its own label.
-        */
+        // Refuse to write past the end of the image rather than letting the stream extend it.
         size_t imageSize = currentDrive->image->GetSize();
 
         if (diskLinear >= imageSize)
@@ -490,12 +441,7 @@ namespace Motion
             size_t source = iopb.dba + transferred;
             uint32_t i = 0;
 
-            /*
-                The byte lanes are crossed the same way round as on the way in: a 16-bit read at an
-                even multibus address gives the byte at that address in the low half. Anything odd,
-                or a trailing byte, goes one at a time through MBRead8, which does the crossing
-                itself.
-            */
+            // The byte lanes are crossed the same way round as on the way in: a 16-bit read at an even multibus address gives the byte at that address in the low.
             if (!(source & 1))
             {
                 for (; i + 1 < bytesToTransfer; i += 2)
@@ -571,12 +517,7 @@ namespace Motion
         while (transferred < iopb.rbc
         && !endOfMedia)
         {
-            /*
-                "If the requested transfer count does not specify an integral number of sectors the last
-                sector containing part of the data is read into the on-board buffer in full. Only enough
-                data to exhaust the count is moved to the Multibus buffer." - so clamp against what is
-                LEFT of the count, not against the whole count.
-            */
+            // "If the requested transfer count does not specify an integral number of sectors the last sector containing part of the data is read into the on-board.
             uint32_t remaining = iopb.rbc - transferred;
             uint32_t bytesToTransfer = (remaining < bytesPerSector) ? remaining : (uint32_t)bytesPerSector;
 
@@ -606,11 +547,7 @@ namespace Motion
             size_t destination = iopb.dba + transferred;
             uint32_t i = 0;
 
-            /*
-                The byte lanes are crossed, so writing a 16-bit (sector[i + 1] << 8) | sector[i] lands
-                sector[i] at multibus address destination + i and sector[i + 1] at destination + i + 1.
-                Only true when destination + i is even, so anything odd or left over goes a byte at a time.
-            */
+            // The byte lanes are crossed, so writing a 16-bit (sector[i + 1] << 8) | sector[i] lands sector[i] at multibus address destination + i and sector[i +.
             if (!(destination & 1))
             {
                 for (; i + 1 < bytesToTransfer; i += 2)

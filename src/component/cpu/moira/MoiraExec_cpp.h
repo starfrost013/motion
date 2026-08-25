@@ -2405,16 +2405,7 @@ Moira::execJsr(u16 opcode)
             // Jump to new address
             reg.pc = ea;
 
-            /*
-                The return address is on the stack by now, so this fetch must not restart the jsr:
-                doing so pushes it a second time, and every argument the callee then reads through
-                its frame pointer is off by four. It is the one prefetch in the instruction set that
-                follows a side effect which has already committed, so it needs what fullPrefetch
-                does for the branches - pc0 pointing at the target, so a fault on a text page that
-                is not resident yet resumes at the target with the push done once. A real 68020
-                reaches the same place by rerunning only the faulted bus cycle out of a long bus
-                fault frame.
-            */
+            // The return address is on the stack by now, so this fetch must not restart the jsr: doing so pushes it a second time, and every argument the callee.
             reg.pc0 = reg.pc;
 
             queue.irc = (u16)read<C, AddrSpace::PROG, Word>(ea);
@@ -2471,16 +2462,7 @@ Moira::execJsr(u16 opcode)
             // Jump to new address
             reg.pc = ea;
 
-            /*
-                The return address is on the stack by now, so this fetch must not restart the jsr:
-                doing so pushes it a second time, and every argument the callee then reads through
-                its frame pointer is off by four. It is the one prefetch in the instruction set that
-                follows a side effect which has already committed, so it needs what fullPrefetch
-                does for the branches - pc0 pointing at the target, so a fault on a text page that
-                is not resident yet resumes at the target with the push done once. A real 68020
-                reaches the same place by rerunning only the faulted bus cycle out of a long bus
-                fault frame.
-            */
+            // The return address is on the stack by now, so this fetch must not restart the jsr: doing so pushes it a second time, and every argument the callee.
             reg.pc0 = reg.pc;
 
             queue.irc = (u16)read<C, AddrSpace::PROG, Word>(ea);

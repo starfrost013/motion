@@ -65,17 +65,7 @@ namespace Motion
 
     // These are the same as memory read but due to the bitplane organisation we need to apply the write mask
 
-    /*
-        Every access is bounds checked, and it has to be. The drawing engines walk rectangles out of
-        registers the guest wrote - UC4's fill and character draw run x and y straight from xsb/xeb
-        and ysb/yeb - so a guest that asks to draw off the end of the screen would otherwise run off
-        the end of this allocation and into the host heap. Real bitplanes cannot be addressed past
-        their own ends; dropping the access is the closest thing to what the hardware does, and it
-        turns a corrupted heap into a pixel that is not drawn.
-
-        This is not a hypothetical: it fires as soon as the GL2 stack comes up far enough to program
-        UC4, and it lands as a crash somewhere else entirely, whenever the heap is next touched.
-    */
+    // Every access is bounds checked, and it has to be.
     bool BP3::InRange(size_t addr, size_t width)
     {
         return vram && (addr + width) <= GetCapacity();
@@ -89,13 +79,7 @@ namespace Motion
         return vram[addr];
     }
 
-    /*
-        VRAM is host order 32 bit pixels rather than a big endian byte array - the dumps and DC4 both
-        read it that way - so unlike memory.cpp these stay in host order. What does change is the
-        indexing: addr >> 1 / addr >> 2 threw the low address bits away, so a misaligned access, which
-        a 68020 is allowed to make, silently aliased onto a lower pixel. memcpy reads the bytes that
-        were actually asked for and is identical to the old code whenever the address was aligned.
-    */
+    // VRAM is host order 32 bit pixels rather than a big endian byte array - the dumps and DC4 both read it that way - so unlike memory.cpp these stay in.
     uint16_t BP3::Read16(size_t addr) 
     {
         if (!InRange(addr, sizeof(uint16_t)))

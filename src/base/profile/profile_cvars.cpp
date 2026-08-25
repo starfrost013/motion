@@ -27,18 +27,10 @@ namespace Motion
         profileDisk0Path = Cvar::Get("profileDisk0Path", "3130.img");
         profileDisk1Path = Cvar::Get("profileDisk1Path", "3130_2.img");
 
-        /*
-            direct is the default so that a machine still keeps what it writes. overlay is the one to
-            reach for while developing: the image on disk is never touched, so it does not matter how
-            the emulator stops, and it does not matter if two of them are running. See disk_image.hpp.
-        */
-        /*
-            Which disk controller is fitted: dsd, storager or none. A machine has one, and which one
-            it is decides what the machine *is* - the DSD makes it a 3115, the Storager a 3130.
-            profileDisk0Path and profileDisk1Path are the two drives on whichever it is.
-        */
+        // Which disk controller is fitted: dsd, storager or none. It also picks the floppy and tape, since these are combined boards.
         diskController = Cvar::Get("diskController", "dsd");
 
+        // direct is the default so that a machine still keeps what it writes; overlay is copy on write.
         diskWriteMode = Cvar::Get("diskWriteMode", "direct");
         diskCommitOnExit = Cvar::Get("diskCommitOnExit", "0");
     }

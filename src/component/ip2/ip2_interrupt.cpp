@@ -1,11 +1,4 @@
-/*
-    m  o  t  i  o  n
-    The SGI Emulator
-
-    Copyright (c)2026 starfrost
-
-    ip2_interrupt.cpp: The interrupt logic on the IP2 board.
-*/
+/* motion - The SGI Emulator. Copyright (c)2026 starfrost. ip2_interrupt.cpp: The interrupt logic on the IP2 board. */
 
 #include <base/emulation.hpp>
 #include <component/ip2/ip2_interrupt.hpp>
@@ -53,10 +46,7 @@ namespace Motion
         Update();
     }
 
-    /*
-        Multibus 0 and 1 share level 1; 2 to 7 get a level each. Level 6 also carries the two DUARTs,
-        the external input and the RTC, and level 7 also carries parity and the mouse.
-    */
+    // Multibus 0 and 1 share level 1; 2 to 7 get a level each.
     uint8_t IP2Interrupt::PendingLevels()
     {
         uint8_t levels = 0;
@@ -107,11 +97,7 @@ namespace Motion
         cpu->SetIRQLine(level);
     }
 
-    /*
-        The level alone picks the vector for everything except levels 6 and 7, where whichever local
-        source is asserting decides. Where more than one is, the real PROM encodes a fixed priority;
-        the order used here is by line number, which is the order the vector numbers are assigned in.
-    */
+    // The level alone picks the vector for everything except levels 6 and 7, where whichever local source is asserting decides.
     uint8_t IP2Interrupt::GetVector(int32_t level)
     {
         uint8_t candidates = 0;

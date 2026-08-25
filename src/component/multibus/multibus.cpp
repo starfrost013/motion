@@ -36,14 +36,7 @@ namespace Motion
 
         AddrSpace::AddMapping(mappingIo);
 
-        /*
-            There used to be a second mapping here that pointed the top megabyte of physical RAM at
-            this component, so that bus masters writing "Multibus memory" landed somewhere. That was
-            standing in for the slave map, and it only worked because the PROM happens to program the
-            map to point at exactly that megabyte. It also meant the CPU could not reach the backplane
-            through segment 4 at all, which is where the PROM reads a freshly DMAed kernel back from.
-            DecodeSlave does the real thing now.
-        */
+        // There used to be a second mapping here that pointed the top megabyte of physical RAM at this component, so that bus masters writing "Multibus memory".
 
         // find the memory so we can use it
         if (!memory)
@@ -54,11 +47,7 @@ namespace Motion
             cpu = Emulation::GetMachine()->FindComponentByType<ComponentCPU>();
     }
 
-    /*
-        The eight Multibus interrupt lines are shared, open collector, and they do not map one to one
-        onto the CPU's seven levels - 0 and 1 both come out on level 1. The IP2 interrupt logic owns
-        that mapping and the priority decode, so just hand the line state over.
-    */
+    // The eight Multibus interrupt lines are shared, open collector, and they do not map one to one onto the CPU's seven levels - 0 and 1 both come out on.
     void Multibus::SetMultibusIRQ(int32_t number, bool asserted)
     {
         if (number < 0 || number >= MULTIBUS_NUM_IRQ)
@@ -174,13 +163,7 @@ namespace Motion
         return true; 
     }   
 
-    /*
-        Nothing on the backplane claimed this address, so the IP2 answers for it itself: the first
-        megabyte of Multibus memory is a window onto system RAM through the slave map, and the second
-        is the map SRAM. Anything else is a hole - nothing drives DSACK, the cycle times out and BERR
-        is asserted. The PROM relies on that: gl2_probe decides whether a GF2 is fitted by reading the
-        FBC flags at 0x50002400 and seeing whether it bus errors.
-    */
+    // Nothing on the backplane claimed this address, so the IP2 answers for it itself: the first megabyte of Multibus memory is a window onto system RAM.
     void Multibus::LogUnmapped(const char* what, size_t addr, bool isWrite, uint32_t value)
     {
         if (unmappedLogged >= MULTIBUS_MAX_UNMAPPED_LOGGED)

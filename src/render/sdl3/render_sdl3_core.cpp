@@ -203,34 +203,14 @@ namespace Motion
             if (event.type == SDL_EVENT_QUIT)
                 Program::running = false; 
                 
-            /*
-                Losing focus has to be told to the emulation whether or not ImGui wants the keyboard,
-                because the key-up for anything currently held is going to be delivered somewhere
-                else entirely. A keyboard that tracks held keys - and the IRIS one has to, IRIX
-                works out shift and control purely from make and break codes - would otherwise be
-                left believing a modifier is still down.
-            */
+            // Losing focus has to be told to the emulation whether or not ImGui wants the keyboard, because the key-up for anything currently held is going to be.
             if (event.type == SDL_EVENT_WINDOW_FOCUS_LOST)
             {
                 FocusLostEvent evt = FocusLostEvent();
                 EventSystem::FireEvent(evt);
             }
 
-            /*
-                WantTextInput, not WantCaptureKeyboard. The latter is true for as long as ImGui has
-                keyboard navigation active, which - with ImGuiConfigFlags_NavEnableKeyboard set
-                above - is essentially always once any window has been focused. Gating on it meant
-                every keystroke was swallowed before it reached the guest and the emulated keyboard
-                looked dead.
-
-                WantTextInput is the narrower question actually being asked here: is the user typing
-                into a debugger text field right now? If they are, the debugger should have the keys.
-                If they are not, the machine should.
-
-                Note the flag still leaves ImGui reacting to the arrow keys, Enter and Space for its
-                own navigation while the guest is also receiving them. Dropping
-                ImGuiConfigFlags_NavEnableKeyboard would settle that, but that is a UI decision.
-            */
+            // WantTextInput, not WantCaptureKeyboard.
             if (!io->WantTextInput)
             {
                 if (event.type == SDL_EVENT_KEY_DOWN)
@@ -282,14 +262,7 @@ namespace Motion
                 }
                 else if (event.type == SDL_EVENT_MOUSE_MOTION)
                 {
-                    /*
-                        Relative, not absolute. The IRIS mouse is a quadrature encoder - it reports
-                        that it moved one tick, and the direction, and nothing else - so where the
-                        host pointer is on the host screen is not something the guest can be told.
-                        The two pointers therefore drift apart whenever the host one leaves the
-                        window or the guest one hits an edge, which is what a real machine sharing a
-                        desk with the mouse would do too.
-                    */
+                    // Relative, not absolute.
                     MouseMotionEvent evt = MouseMotionEvent();
                     evt.deltaX = event.motion.xrel;
                     evt.deltaY = event.motion.yrel;

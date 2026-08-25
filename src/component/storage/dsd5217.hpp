@@ -1,28 +1,4 @@
-/* 
-    m  o  t  i  o  n
-    The SGI Emulator
-
-    Copyright (c)2026 starfrost
-
-    dsd5217.hpp: The Qualogy (previously known as Data Systems Design) DSD 5217 Multibus Disk & Tape Controller
-    This is a combined QIC tape, hard drive and floppy controller.
-    
-    Technically not used on the 3130 (3120) but this is the only controller that I've got a disk image for right now
-    Later on we can run mkboot and boot this
-
-    Currently this is a high-level emulation, but this uses the Intel 8085. Later on we'll write an 8085 emulation.
-
-    The controller is a Multibus BUS MASTER and decodes NOTHING except its single programmed I/O port.
-    The wake-up block, channel control block, controller invocation block, I/O parameter block and every
-    data buffer live in ordinary Multibus RAM; the controller walks that chain of pointers itself when the
-    host pokes a start command into the port. We do the same, rather than trying to snoop the host's writes
-    to those structures - claiming a memory window for them punches a hole in whatever the host is DMAing
-    through, which is exactly the sort of thing that eats half a kernel.
-
-    Sources:
-    https://bitsavers.trailing-edge.com/pdf/dsd/5215_5217/040040-01_5215_Users_Guide_198404.pdf
-    https://bitsavers.trailing-edge.com/pdf/dsd/5215_5217/040069-01_5217_Users_Guide_Addendu_198404.pdf
-*/
+/* motion - The SGI Emulator. Copyright (c)2026 starfrost. dsd5217.hpp: The Qualogy (previously known as Data Systems Design) DSD 5217 Multibus Disk & Tape Controller This is a. */
 
 #pragma once
 #include <Motion.hpp>
@@ -52,27 +28,10 @@ namespace Motion
     #define DSD5217_WUB_OFF_EXTENSION           0x00    // multibus byte offsets within the WUB
     #define DSD5217_WUB_OFF_CCB_PTR             0x02
 
-    /*
-        Control block pointers are paragraph (16 byte) granular: the low four bits of every block pointer
-        the controller chains through are ignored. SGI's PROM depends on this - it hands the controller a
-        CIB pointer four bytes into its own structure and expects it to be rounded back down, which is the
-        only way its operation status byte, status semaphore and IOPB pointer land where the manual says
-        they should. Data buffer addresses are NOT rounded.
-    */
-    // Block pointers are 24 bit Multibus addresses and are used as they stand.
+    // Block pointers are 24 bit Multibus addresses, used as they stand.
     #define DSD5217_BLOCK_PTR_MASK              0xFFFFFF
 
-    /*
-        The CIB pointer is the one exception: it names the CIB's byte 4 rather than its base. SGI's
-        driver builds the block, hands the controller `lea 4(cib)`, and then writes operation status,
-        the semaphores and the IOPB pointer at the manual's offsets from the *base*.
-
-        This used to be handled by rounding every block pointer down to a 16 byte boundary, which is
-        the same thing only while the block happens to be paragraph aligned. The PROM's blocks are;
-        the kernel's are not - its CCB sits at multibus 0x1cde and its CIB at 0x1cee - so rounding
-        read every field fourteen bytes low, the CIB pointer came back as zero and dsdinit sat in its
-        ten million iteration timeout and printed "dsd0: ccb timeout during init".
-    */
+    // The CIB pointer is the one exception: it names the CIB's byte 4 rather than its base.
     #define DSD5217_CIB_PTR_BIAS                4
 
     // this is configurable on the real thing with jumpers but for now just do this
@@ -190,13 +149,7 @@ namespace Motion
 
         const char* GetName() { return "DSD/Qualogy 5217 Multibus Disk & Tape Controller"; };
 
-        /*
-            These are DECODED COPIES of the control blocks, not overlays onto guest memory - the controller
-            fetches them out of Multibus RAM when it is started. The comment on each field is its Multibus
-            byte offset within the block, which is what the manuals use. Note that the IP2 crosses the byte
-            lanes, so Multibus offset N is the byte the host wrote at N ^ 1: that is why the layout below
-            looks transposed compared to what you see in a memory viewer.
-        */
+        // These are DECODED COPIES of the control blocks, not overlays onto guest memory - the controller fetches them out of Multibus RAM when it is started.
 
         /// @brief Wake Up Block (5215 User Guide, figure 4-4)
         struct WUB
@@ -291,11 +244,7 @@ namespace Motion
             uint8_t sb[DSD5217_SB_SIZE];        // the status buffer ?
         }; 
 
-        /*
-            One physical drive. The controller supports two winchesters and the IOPB names which one
-            every command is for, so the geometry an Initialize sets belongs to the drive rather than
-            to the board - two drives of different shapes would otherwise overwrite each other's.
-        */
+        // One physical drive.
         struct Drive
         {
             DiskImage* image = nullptr;
@@ -329,15 +278,7 @@ namespace Motion
         IOPB iopb = {0};
         INIST inist = {0};
 
-        /* 
-            Multibus <-> 68020 byte lane translation.
-
-            The IP2 wires the 68020's D0-D7 to the Multibus' D8-D15 and vice versa, so the byte the
-            controller sees at Multibus address N is the byte the CPU wrote to address N ^ 1. The 5215
-            User Guide spells this out in the note under figure 4-3 ("The MC68000 looks at the bytes in
-            reverse"). Anything wider than a byte is little endian from the controller's point of view -
-            it is an 8085 - which is why the host stores every 32-bit field with its halves swapped.
-        */
+        // Multibus <-> 68020 byte lane translation.
         uint8_t MBRead8(size_t mbAddr);
         uint16_t MBRead16(size_t mbAddr);
         uint32_t MBRead32(size_t mbAddr);
