@@ -453,7 +453,11 @@ goobies". It is named in `ExecuteFBCCommand` now so it stops reading as an unimp
 
 ## The GUI: where it lives on the disk
 
-**There is a dedicated handoff for this: `resume-prompt-mex.md`.** It has how to run mex, what each
+**`resume-prompt-multiuser.md` is the handoff for the session that got this machine booting
+unattended to `IRIS login:`** - the misaligned-access fix, copy-on-write disks, the DUART carrier
+bug, how `3130-si0-gui.img` is set up, and why `rusty-backup` is the right tool for these images.
+
+**There is a dedicated handoff for the GUI: `resume-prompt-mex.md`.** It has how to run mex, what each
 blocker was, the two behaviours that look like bugs and are not, and what is still missing. Read that
 rather than working from the summary below if the GUI is the job.
 
