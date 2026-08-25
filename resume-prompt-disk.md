@@ -223,6 +223,14 @@ Nothing blocks a working disk. In rough order of how much each one buys:
 
 ## Two things that are not bugs
 
+* **Repairing this filesystem: `fsck` then `sync` undoes the repair.** IRIX's `/etc/fsck` writes the
+  corrected free list to the raw device while the kernel has the same filesystem mounted with its own
+  in-core bitmap, so the next `sync` writes the stale copy straight back over it. That is why every
+  fsck kept reporting the identical faults and never converged. Two ways out: run fsck and stop the
+  machine *without* syncing, or - much better - repair the image offline with
+  `rb-cli fsck --repair <img>@1`, which has no kernel to argue with. See the rusty-backup note in
+  `resume-prompt.md`; it found damage IRIX's own fsck had been claiming to fix for hours.
+
 * **`filesystem corruption on si0a` after a boot you killed.** EFS flushes its free bitmap from
   `efs_update`, so a machine stopped after allocating a block leaves an inode pointing at a block the
   on-disk bitmap still calls free. It is what a real machine does when you pull the plug.

@@ -486,13 +486,40 @@ kept in `scratch/hd/tape-*.list`. The tape `/usr` is the same release as the dis
 tapes add nothing unless a disk has to be built from scratch. That directory also has the BP3, DC4,
 GF2, UC4 and keyboard firmware dumps, the IP2 PALs, `sgidemos.tar.Z` and `gcc_2.1_SGI3k.tar`.
 
-**`~/repos/rusty-backup` cannot touch this filesystem.** Its SGI support is EFS v1 as IRIX 5.3-6.5
-writes it: it requires `fs_magic` (0x00072959 / 0x0007295A) at superblock offset 28 and rejects
-anything else. IRIX 3.7 is EFS's *ancestor* and has **no magic at all** - `fs_ncg`, `fs_dirty`,
-`fs_time`, then straight into `fs_fname` - so the header is 6 bytes shorter and everything from
-`fs_time` on is displaced. `scratch/efswrite.py` is the tool that understands this one; it rewrites a
-file in place when the new contents still fit the blocks already allocated, which is two edits (the
-data blocks and `di_size`) and needs no allocator.
+**`~/repos/rusty-backup` is the best tool for this disk, and an earlier version of this note said the
+opposite.** It has *two* SGI implementations: `src/fs/efs.rs` is EFS as IRIX 5.3-6.5 writes it, which
+does want `fs_magic` 0x00072959 at superblock offset 28 and rejects this volume - and
+`src/fs/efs_v1.rs` is **the ancestor**, which is exactly what IRIX 3.7 has. The magic is not missing,
+it is six bytes further on, because the 68020 packs the superblock 2-byte aligned and `fs_time` at
+0x16 shifts everything after it:
+
+```
+fs_magic @0x26 = 0x00041755      <- EFS_V1_MAGIC
+fs_size 17848  fs_firstcg 8  fs_cgfsize 3568  fs_ncg 5  fs_fname "root"  fs_fpack "sgi"
+```
+
+Its module header says it was verified against `<sys/efs_sb.h>` "as recovered from a real IRIS 3130
+disk" - this disk - and `docs/SGI_EFS_v1.md` is a genuinely good description of the format. It is
+read/write, it handles the 16-bit byte swap symmetrically, and it has its own `efs_v1_fsck`.
+
+```bash
+cd ~/repos/rusty-backup && cargo build --release --bin rb-cli    # a few minutes, big dep tree
+RB=~/repos/rusty-backup/target/release/rb-cli
+$RB inspect  <img>            # partition table, and it spots the byte swap on its own
+$RB ls       <img>@1 /etc     # @1 is root, @3 is /usr
+$RB get      <img>@1 /etc/inittab out      # absolute host paths - it does not take "-" for stdout
+$RB put --force <img>@1 in /etc/inittab    # mode and owner are preserved from the replaced file
+$RB chmod    <img>@1 /etc/rc.getdate 755
+$RB fsck [--repair] <img>@1
+```
+
+**Its fsck is the way out of the repair loop described below**, because it works on the image with no
+kernel running to undo it. It found the exact damage IRIX kept failing to fix - "block 11670 is used
+by inode 808 but the bitmap marks it free" - rebuilt the bitmap from the inode table, corrected
+`fs_tfree`/`fs_tinode`, and both volumes then verified clean (451 files on root, 2580 on /usr).
+
+`scratch/efswrite.py` still works and needs no build, but it can only rewrite a file in place when the
+new contents fit the blocks already allocated, and it cannot change a mode.
 
 **The partition table is at image block 0**, not an SGI `dvh` - it is `struct disk_label` from
 `sys/h/dklabel.h`, magic `0x00072959`, the drive name ("Priam V170") at 0x5c, `d_controller` at 0x06
