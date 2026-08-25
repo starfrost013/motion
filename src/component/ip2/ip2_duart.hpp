@@ -124,6 +124,21 @@ namespace Motion
     #define DUART_READ_1X16X                        0xA             // 0xA: [Read] 1x/16x Test
     #define DUART_READ_RX_HOLD_B                    0xB             // 0xB: [Read] Rx Holding Register B
     #define DUART_READ_INPUT_PORTS                  0xD             // 0xD: [Read] Input Ports IP0-IP6
+
+    /*
+        Carrier detect, and it is **active low** - a clear bit means carrier present. sduart.c says so
+        outright: "the input is low-true", and du_act() clears DP_DCD when the bit reads set.
+
+            #if defined(IP2) || defined(IP4)
+            #define IPORT_DCDA  0x08        // dcd input bit for A ports
+            #define IPORT_DCDB  0x04        // dcd input bit for B ports
+
+        This matters the moment anything reaches multi-user. /etc/gettydefs' co_9600 is
+        "B9600 SANE TAB3" with no CLOCAL, so du_open() waits for carrier before it will open the line,
+        and a getty that never opens is a console that never prints `login:`.
+    */
+    #define DUART_IPORT_DCDA                        0x08
+    #define DUART_IPORT_DCDB                        0x04
     #define DUART_READ_START_COUNTER_CMD            0xE             // 0xE: [Read] Start Counter Command
     #define DUART_READ_STOP_COUNTER_CMD             0xF             // 0xF: [Read] Stop Counter Command
 

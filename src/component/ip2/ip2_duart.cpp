@@ -119,9 +119,19 @@ namespace Motion
                 // test mode toggle, similar in spirit to the BRG test - not meaningfully emulated beyond this
                 break;
             case DUART_READ_INPUT_PORTS:
-                // D7 always reads 1; D6 reflects IACKN, which isn't modeled here (no interrupt acknowledge
-                // cycles yet), so it's also left high; IP0-5 are pulled up with nothing external attached.
-                ret = 0xFF;
+                /*
+                    D7 always reads 1; D6 reflects IACKN, which isn't modeled here (no interrupt
+                    acknowledge cycles yet), so it's also left high; IP0-5 are pulled up with nothing
+                    external attached.
+
+                    Except the two carrier-detect inputs, which are **active low** - see the note in
+                    the header. Both lines report carrier present, because in an emulator the terminal
+                    on the other end is always plugged in and always powered on. Answering 0xFF here
+                    meant "no carrier on every line", so du_open() blocked forever and the console
+                    getty never printed `login:` - the machine reached run level 2 and then went
+                    silent, which looked like a hang and was a modem control line.
+                */
+                ret = 0xFF & ~(DUART_IPORT_DCDA | DUART_IPORT_DCDB);
                 break;
             case DUART_READ_START_COUNTER_CMD:
                 // "the counter/timer is loaded with the value in CTUR/CTLR and begins counting down"
