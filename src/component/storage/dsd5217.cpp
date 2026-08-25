@@ -320,6 +320,9 @@ namespace Motion
                     break;
                 case DSD5217_FUNC_READ_DATA:
                     ok = ReadSector();
+                    break;
+                case DSD5217_FUNC_WRITE:
+                    ok = WriteSector();
                     break; 
                 default:
                     commandIsImplemented = false; 
@@ -397,6 +400,139 @@ namespace Motion
     }
 
     // Read Data (04h)
+    /*
+        Write Data, the mirror of ReadSector below and sharing all of its addressing. Until this
+        existed the guest could not put a byte on the disk, which is a great deal more than an
+        inconvenience: /etc/brc asks for the machine's model number on every boot because it can only
+        stop asking once /etc/model exists, and /etc/bcheckrc asks about the date and the filesystem
+        for the same reason. Nothing the machine was told could be remembered.
+
+        A partial last sector is written short rather than read-modify-written. That is the same
+        answer a real controller arrives at the long way round - it would read the sector into its
+        buffer, overlay the bytes it was given and write the whole thing back, and the bytes it did
+        not overlay are the ones already on the disk.
+    */
+    bool DSD5217::WriteSector()
+    {
+        size_t bytesPerSector = GetBytesPerSector();
+
+        if (!bytesPerSector
+        || bytesPerSector > DSD5217_MAXIMUM_BUFFER_SIZE)
+        {
+            Logger::Log(DSD5217_LOG_PREFIX, "Write issued before a valid Initialize command, refusing to transfer", LogChannels::Warning);
+            inist.sb[DSD5217_SB_HARD_ERROR0] |= DSD5217_HARDERR0_ILLEGAL_FORMAT;
+            return false;
+        }
+
+        size_t diskLinear = CHSToLinear();
+
+        if (iopb.rbc == 0)
+            iopb.rbc = (uint32_t)bytesPerSector;
+
+        if ((iopb.dba + iopb.rbc) > 0xFFFFF)
+            Logger::Log(DSD5217_LOG_PREFIX, std::format("Transfer from 0x{:x}..0x{:x} leaves the emulated 1MB multibus window and will wrap",
+                iopb.dba, iopb.dba + iopb.rbc).c_str(), LogChannels::Warning);
+
+        /*
+            Refuse to write past the end of the image rather than letting the stream extend it. A
+            disk that silently grows is worse than one that reports an error: the partition table
+            and the filesystem both describe a fixed number of blocks, so anything landing beyond
+            them is lost anyway and only makes the file no longer match its own label.
+        */
+        hdd->stream.clear();
+        hdd->stream.seekg(0, std::ios_base::end);
+
+        size_t imageSize = (size_t)hdd->stream.tellg();
+
+        if (diskLinear >= imageSize)
+        {
+            Logger::Log(DSD5217_LOG_PREFIX, std::format("Refusing to write at 0x{:x}, past the end of a {} byte image",
+                diskLinear, imageSize).c_str(), LogChannels::Warning);
+
+            inist.sb[DSD5217_SB_HARD_ERROR0] |= DSD5217_HARDERR0_END_OF_MEDIA;
+            return false;
+        }
+
+        uint32_t transferred = 0;
+        bool endOfMedia = false;
+
+        while (transferred < iopb.rbc
+        && !endOfMedia)
+        {
+            uint32_t remaining = iopb.rbc - transferred;
+            uint32_t bytesToTransfer = (remaining < bytesPerSector) ? remaining : (uint32_t)bytesPerSector;
+
+            if (diskLinear + transferred + bytesToTransfer > imageSize)
+            {
+                bytesToTransfer = (uint32_t)(imageSize - (diskLinear + transferred));
+                endOfMedia = true;
+
+                if (!bytesToTransfer)
+                    break;
+            }
+
+            size_t source = iopb.dba + transferred;
+            uint32_t i = 0;
+
+            /*
+                The byte lanes are crossed the same way round as on the way in: a 16-bit read at an
+                even multibus address gives the byte at that address in the low half. Anything odd,
+                or a trailing byte, goes one at a time through MBRead8, which does the crossing
+                itself.
+            */
+            if (!(source & 1))
+            {
+                for (; i + 1 < bytesToTransfer; i += 2)
+                {
+                    uint16_t dat = multibus->ReadMB16(source + i);
+
+                    sectorBuffer[i] = (uint8_t)(dat & 0xFF);
+                    sectorBuffer[i + 1] = (uint8_t)(dat >> 8);
+                }
+            }
+
+            for (; i < bytesToTransfer; i++)
+                sectorBuffer[i] = MBRead8(source + i);
+
+            // Reposition between reading and writing the same stream, and flush so that a reader
+            // coming straight back for these blocks sees them.
+            hdd->stream.clear();
+            hdd->stream.seekp(diskLinear + transferred, std::ios_base::beg);
+            hdd->stream.write((const char*)sectorBuffer, bytesToTransfer);
+            hdd->stream.flush();
+
+            if (hdd->stream.fail())
+            {
+                Logger::Log(DSD5217_LOG_PREFIX, std::format("Write of {} bytes at 0x{:x} failed",
+                    bytesToTransfer, diskLinear + transferred).c_str(), LogChannels::Error);
+
+                inist.sb[DSD5217_SB_HARD_ERROR0] |= DSD5217_HARDERR0_END_OF_MEDIA;
+                hdd->stream.clear();
+                return false;
+            }
+
+            transferred += bytesToTransfer;
+        }
+
+        iopb.actualTransfers = transferred;
+
+        MBWrite32((cib.iopbPtr & DSD5217_BLOCK_PTR_MASK) + 0x04, iopb.actualTransfers);
+
+        Logger::Log(DSD5217_LOG_PREFIX, std::format("Write Data Command: Wrote {} of {} bytes from multibus memory 0x{:x} to 0x{:x} to disk position 0x{:x} to 0x{:x}",
+            iopb.actualTransfers, iopb.rbc, iopb.dba, iopb.dba + iopb.actualTransfers, diskLinear, diskLinear + iopb.actualTransfers).c_str());
+
+        if (transferred < iopb.rbc)
+        {
+            Logger::Log(DSD5217_LOG_PREFIX, std::format("Ran off the end of the disk image writing at 0x{:x}. Is the image big enough?",
+                diskLinear + transferred).c_str(), LogChannels::Warning);
+
+            inist.sb[DSD5217_SB_HARD_ERROR0] |= DSD5217_HARDERR0_END_OF_MEDIA;
+            return false;
+        }
+
+        return true;
+    }
+
     bool DSD5217::ReadSector()
     {
         size_t bytesPerSector = GetBytesPerSector();

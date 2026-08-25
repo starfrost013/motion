@@ -352,6 +352,7 @@ namespace Motion
         size_t GetBytesPerSector();
 
         bool ReadSector();
+        bool WriteSector();
         bool ReadInitBlock();
         bool WriteStatusBlock();
 
