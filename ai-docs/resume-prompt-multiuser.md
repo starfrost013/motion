@@ -2,15 +2,13 @@
 
 Paste the section below into a new session. Everything after the horizontal rule is the prompt.
 
-Read `resume-prompt.md` first — it is the general handoff. `resume-prompt-disk.md` is storage and
-`resume-prompt-mex.md` is the window manager. This one covers the session that turned a 3115 booting
-to a single-user serial shell into a 3130 booting unattended to `IRIS login:`.
+This covers the work that turned a 3115 booting to a single-user serial shell into a 3130 booting
+unattended to `IRIS login:`. `launch.md` alongside it is how to build and run.
 
 ---
 
-We're working on `motion`, an SGI IRIS 3130 emulator at `/home/dani/repos/motion`. Read
-`resume-prompt.md` for the general state; **this document is what changed in the multi-user session
-and what is worth doing next.**
+We're working on `motion`, an SGI IRIS 3130 emulator at `/home/dani/repos/motion`. **This document
+is what changed in the multi-user session and what is worth doing next.**
 
 Every path in this document is relative to the repo root, not to `ai-docs/`.
 
@@ -82,7 +80,7 @@ bits away. A 68020 *permits* misaligned word and long operands, so IRIX's compil
 early. That was the `wsiris` -> `|wsiri` corruption, `TZ` -> `TPST8PDT`, `telinit` -> `elinit`, and
 the long-standing type-ahead bug. `PROM`, `PROM_SRAM` and `BP3` had the same indexing.
 
-**`124dd05` — the Interphase Storager.** `resume-prompt-disk.md` has this in full.
+**`124dd05` — the Interphase Storager.** See the header comments in `storager2.hpp`.
 
 ## The disk image, and why it boots multi-user
 
@@ -112,7 +110,7 @@ happening, change the case to a plain `exit 0` for 3130 and repair offline inste
 
 ## rusty-backup reads and writes this disk, and it is the tool to reach for
 
-**An earlier version of `resume-prompt.md` said it could not. That was wrong** and it cost real time.
+**An earlier note said it could not. That was wrong** and it cost real time.
 `~/repos/rusty-backup` has two SGI implementations: `src/fs/efs.rs` is EFS as IRIX 5.3-6.5 writes it,
 which does want `fs_magic` 0x00072959 at superblock offset 28 and rejects this volume — and
 `src/fs/efs_v1.rs` is **the ancestor**, which is exactly what IRIX 3.7 has. The magic is not missing,
@@ -199,7 +197,7 @@ or nothing at all.
 ## Other things worth doing
 
 * **The tape and floppy halves of the Storager** — `siq0` (QIC02 at 0x73FC) and `sf0`. Both are the
-  same board and neither is fitted; see `resume-prompt-disk.md`.
+  same board and neither is fitted.
 * **`si1`** works now (two drives on one controller), but there is no floppy image support.
 * **GF2 geometry** — no clipping, no z-buffer, and `FBCmasklist` does nothing so drawing is not
   clipped to a window. The demos in `/usr/people/demos` (`airshow`, `jet`, `flight`, `cube`, `arch`)

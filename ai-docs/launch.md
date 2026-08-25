@@ -119,5 +119,5 @@ bitmap in core, and the next `sync` puts the stale copy straight back — the re
   window. The GL demos in `/usr/people/demos` will draw something and be wrong in interesting ways.
 * Shutdown segfaults on the way out. Pre-existing, harmless with `overlay`.
 
-`resume-prompt.md` is the full state of the project; `resume-prompt-multiuser.md`,
-`resume-prompt-disk.md` and `resume-prompt-mex.md` cover multi-user, storage and the window manager.
+`resume-prompt-multiuser.md` alongside this carries the working notes: what changed, what is
+verified, and the known gaps.

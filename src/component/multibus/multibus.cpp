@@ -48,6 +48,41 @@ namespace Motion
     }
 
     // The eight Multibus interrupt lines are shared, open collector, and they do not map one to one onto the CPU's seven levels - 0 and 1 both come out on.
+    /* A 16-bit access at an even address carries the byte at that address in its low half, so pairs move twice as fast as singles;
+       anything odd or trailing goes a byte at a time through the ^ 1 that the crossing amounts to. */
+    void Multibus::ReadMBBlock(size_t addr, uint8_t* dst, size_t length)
+    {
+        size_t i = 0;
+
+        if (!(addr & 1))
+        {
+            for (; (i + 1) < length; i += 2)
+            {
+                uint16_t dat = ReadMB16(addr + i);
+
+                dst[i] = (uint8_t)(dat & 0xFF);
+                dst[i + 1] = (uint8_t)(dat >> 8);
+            }
+        }
+
+        for (; i < length; i++)
+            dst[i] = ReadMB8((addr + i) ^ 1);
+    }
+
+    void Multibus::WriteMBBlock(size_t addr, const uint8_t* src, size_t length)
+    {
+        size_t i = 0;
+
+        if (!(addr & 1))
+        {
+            for (; (i + 1) < length; i += 2)
+                WriteMB16(addr + i, (uint16_t)((src[i + 1] << 8) | src[i]));
+        }
+
+        for (; i < length; i++)
+            WriteMB8((addr + i) ^ 1, src[i]);
+    }
+
     void Multibus::SetMultibusIRQ(int32_t number, bool asserted)
     {
         if (number < 0 || number >= MULTIBUS_NUM_IRQ)

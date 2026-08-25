@@ -139,6 +139,11 @@ namespace Motion
         void WriteMB16(size_t addr, uint16_t value) { Write16(MULTIBUS_MEMORY_START + (addr & MULTIBUS_ADDRESS_MASK), value); }
         void WriteMB32(size_t addr, uint32_t value) { Write32(MULTIBUS_MEMORY_START + (addr & MULTIBUS_ADDRESS_MASK), value); }
 
+        /// @brief Copy a block out of Multibus memory, uncrossing the byte lanes: dst[i] is the Multibus byte at addr + i.
+        void ReadMBBlock(size_t addr, uint8_t* dst, size_t length);
+        /// @brief The reverse: the Multibus byte at addr + i becomes src[i].
+        void WriteMBBlock(size_t addr, const uint8_t* src, size_t length);
+
         /// @brief Drive or release one of the eight shared Multibus interrupt lines.
         void SetMultibusIRQ(int32_t number, bool asserted);
 

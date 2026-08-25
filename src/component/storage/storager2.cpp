@@ -604,22 +604,7 @@ namespace Motion
 
             if (write)
             {
-                size_t i = 0;
-
-                // Crossed lanes: a 16-bit read at an even address puts that address's byte in the low half. Odd or trailing bytes go through MBRead8.
-                if (!(buffer & 1))
-                {
-                    for (; (i + 1) < chunk; i += 2)
-                    {
-                        uint16_t dat = multibus->ReadMB16(buffer + i);
-
-                        sector[i] = (uint8_t)(dat & 0xFF);
-                        sector[i + 1] = (uint8_t)(dat >> 8);
-                    }
-                }
-
-                for (; i < chunk; i++)
-                    sector[i] = MBRead8(buffer + i);
+                multibus->ReadMBBlock(buffer, sector, chunk);
 
                 // Straight to the file or into the copy-on-write overlay, depending on the mode. See disk_image.hpp.
                 if (!drive.image->Write(linear + transferred, sector, chunk))
@@ -642,17 +627,7 @@ namespace Motion
                     return false;
                 }
 
-                size_t i = 0;
-
-                // The other way round: that 16-bit word puts sector[i] at buffer + i and sector[i + 1] at buffer + i + 1.
-                if (!(buffer & 1))
-                {
-                    for (; (i + 1) < chunk; i += 2)
-                        multibus->WriteMB16(buffer + i, (uint16_t)((sector[i + 1] << 8) | sector[i]));
-                }
-
-                for (; i < chunk; i++)
-                    MBWrite8(buffer + i, sector[i]);
+                multibus->WriteMBBlock(buffer, sector, chunk);
             }
 
             transferred += chunk;

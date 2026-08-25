@@ -3,22 +3,22 @@
 
 namespace Motion
 {
-    // yes, this checks exactly for one. becaue we don't want duplicatges and check for them 
-    AddrSpaceMapping* AddrSpace::GetMapping(size_t addr) 
-    { 
-        // we are oging to have to optimise this    ``
-        for (auto it : mappings)
+    // Hot: every access goes through here. The cache is checked before its own bounds, so a stale one is harmless.
+    AddrSpaceMapping* AddrSpace::GetMapping(size_t addr)
+    {
+        if (lastMapping
+        && addr >= lastMapping->startAddr
+        && addr <= lastMapping->endAddr)
+            return lastMapping;
+
+        for (auto& entry : mappings)
         {
-            if (addr >= it.second.startAddr
-                && addr <= it.second.endAddr)
-            {
-                // guaranteed to succeed since we *know* that the start address is *always* the key. if the impl changes we'll have to change this
-                // yes, it could create an implicit kv pair if we don't
-                return &mappings[it.second.startAddr];
-            }
+            if (addr >= entry.second.startAddr
+            && addr <= entry.second.endAddr)
+                return lastMapping = &entry.second;
         }
-        
-        return nullptr; 
+
+        return nullptr;
     }
 
     void AddrSpace::LogUnmapped(const char* what, size_t addr, bool isWrite, uint32_t value)

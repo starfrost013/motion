@@ -102,6 +102,9 @@ namespace Motion
             static void Shutdown();
         private: 
             inline static std::unordered_map<size_t, AddrSpaceMapping> mappings;
+
+            // Mappings are only ever added, so an element pointer stays valid; thread_local to keep the render thread's peeks off this line.
+            inline static thread_local AddrSpaceMapping* lastMapping = nullptr;
             
 
             ///pointer to an MMU component

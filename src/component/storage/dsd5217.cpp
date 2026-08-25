@@ -438,23 +438,7 @@ namespace Motion
                     break;
             }
 
-            size_t source = iopb.dba + transferred;
-            uint32_t i = 0;
-
-            // The byte lanes are crossed the same way round as on the way in: a 16-bit read at an even multibus address gives the byte at that address in the low.
-            if (!(source & 1))
-            {
-                for (; i + 1 < bytesToTransfer; i += 2)
-                {
-                    uint16_t dat = multibus->ReadMB16(source + i);
-
-                    sectorBuffer[i] = (uint8_t)(dat & 0xFF);
-                    sectorBuffer[i + 1] = (uint8_t)(dat >> 8);
-                }
-            }
-
-            for (; i < bytesToTransfer; i++)
-                sectorBuffer[i] = MBRead8(source + i);
+            multibus->ReadMBBlock(iopb.dba + transferred, sectorBuffer, bytesToTransfer);
 
             // Straight to the file or into the copy-on-write overlay, depending on the mode. See disk_image.hpp.
             if (!currentDrive->image->Write(diskLinear + transferred, sectorBuffer, bytesToTransfer))
@@ -544,21 +528,7 @@ namespace Motion
                 break;
             }
 
-            size_t destination = iopb.dba + transferred;
-            uint32_t i = 0;
-
-            // The byte lanes are crossed, so writing a 16-bit (sector[i + 1] << 8) | sector[i] lands sector[i] at multibus address destination + i and sector[i +.
-            if (!(destination & 1))
-            {
-                for (; i + 1 < bytesToTransfer; i += 2)
-                {
-                    uint16_t dat = (uint16_t)((sectorBuffer[i + 1] << 8) | sectorBuffer[i]);
-                    multibus->WriteMB16(destination + i, dat);
-                }
-            }
-
-            for (; i < bytesToTransfer; i++)
-                MBWrite8(destination + i, sectorBuffer[i]);
+            multibus->WriteMBBlock(iopb.dba + transferred, sectorBuffer, bytesToTransfer);
 
             transferred += bytesToTransfer;
         }
