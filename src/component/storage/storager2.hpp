@@ -1,4 +1,4 @@
-/* motion - The SGI Emulator. Copyright (c)2026 starfrost. storager2.hpp: The Interphase Storager 2 Multibus ESDI disk controller - SGI's "sii", what makes this a 3130 */
+/* motion - The SGI Emulator. Copyright (c)2026 danifunker. storager2.hpp: The Interphase Storager 2 Multibus ESDI disk controller - SGI's "sii", what makes this a 3130 */
 
 #pragma once
 #include <Motion.hpp>

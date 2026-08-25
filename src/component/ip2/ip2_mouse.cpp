@@ -1,4 +1,4 @@
-/* motion - The SGI Emulator. Copyright (c)2026 starfrost. ip2_mouse.cpp: the quadrature encoder, and the interrupt it raises. */
+/* motion - The SGI Emulator. Copyright (c)2026 danifunker. ip2_mouse.cpp: the quadrature encoder, and the interrupt it raises. */
 
 #include <base/emulation.hpp>
 #include <component/ip2/ip2_mouse.hpp>

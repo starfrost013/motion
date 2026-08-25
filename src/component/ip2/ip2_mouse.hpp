@@ -1,4 +1,4 @@
-/* motion - The SGI Emulator. Copyright (c)2026 starfrost. ip2_mouse.hpp: IP2 mouse button and quadrature registers. */
+/* motion - The SGI Emulator. Copyright (c)2026 danifunker. ip2_mouse.hpp: IP2 mouse button and quadrature registers. */
 
 #pragma once
 #include <atomic>

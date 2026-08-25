@@ -1,4 +1,4 @@
-/* motion - The SGI Emulator. Copyright (c)2026 starfrost. gf2_commands.cpp: the segment 6 command stream. */
+/* motion - The SGI Emulator. Copyright (c)2026 danifunker. gf2_commands.cpp: the segment 6 command stream. */
 
 #include <component/gpu/juniper/gf2/gf2.hpp>
 

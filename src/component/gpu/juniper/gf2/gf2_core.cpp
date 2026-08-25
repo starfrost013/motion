@@ -1,4 +1,4 @@
-/* motion - The SGI Emulator. Copyright (c)2026 starfrost. gf2_core.cpp: GF2 frame buffer controller and geometry pipe front end. */
+/* motion - The SGI Emulator. Copyright (c)2026 danifunker. gf2_core.cpp: GF2 frame buffer controller and geometry pipe front end. */
 
 #include <component/gpu/juniper/gf2/gf2.hpp>
 

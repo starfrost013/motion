@@ -1,4 +1,4 @@
-/* motion - The SGI Emulator. Copyright (c)2026 starfrost. storager2.cpp: The Interphase Storager 2 - "sii". */
+/* motion - The SGI Emulator. Copyright (c)2026 danifunker. storager2.cpp: The Interphase Storager 2 - "sii". */
 
 #include <component/storage/storager2.hpp>
 

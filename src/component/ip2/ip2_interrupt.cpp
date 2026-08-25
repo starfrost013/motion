@@ -1,4 +1,4 @@
-/* motion - The SGI Emulator. Copyright (c)2026 starfrost. ip2_interrupt.cpp: The interrupt logic on the IP2 board. */
+/* motion - The SGI Emulator. Copyright (c)2026 danifunker. ip2_interrupt.cpp: The interrupt logic on the IP2 board. */
 
 #include <base/emulation.hpp>
 #include <component/ip2/ip2_interrupt.hpp>

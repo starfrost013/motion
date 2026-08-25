@@ -1,4 +1,4 @@
-/* motion - The SGI Emulator. Copyright (c)2026 starfrost. gf2.hpp: Silicon Graphics graphics interface / frame buffer controller version 2. */
+/* motion - The SGI Emulator. Copyright (c)2026 danifunker. gf2.hpp: Silicon Graphics graphics interface / frame buffer controller version 2. */
 
 #pragma once
 #include <component/addrspace.hpp>

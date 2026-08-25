@@ -1,4 +1,4 @@
-/* motion - The SGI Emulator. Copyright (c)2026 starfrost. gf2_geometry.cpp: the geometry pipe, and the drawing it feeds. */
+/* motion - The SGI Emulator. Copyright (c)2026 danifunker. gf2_geometry.cpp: the geometry pipe, and the drawing it feeds. */
 
 #include <component/gpu/juniper/gf2/gf2.hpp>
 #include <cmath>
