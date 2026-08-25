@@ -499,8 +499,9 @@ data blocks and `di_size`) and needs no allocator.
 `sys/h/dklabel.h`, magic `0x00072959`, the drive name ("Priam V170") at 0x5c, `d_controller` at 0x06
 and partition entries of `{first(4), size(4)}` in `d_map[8]` starting at **offset 0x16** (an earlier
 version of this note said 0x1a, which is four bytes out): md0a root at block **119** (17850), md0b
-swap at 17969 (17731), md0c `/usr` at **35700** (79730). One label format serves every controller -
-see `resume-prompt-disk.md`.
+swap at 17969 (17731), md0c `/usr` at **35700** (79730). One label format serves every controller,
+which is why moving a disk to the Storager is a two field edit and not a rebuild - `scratch/relabel.py`
+and `resume-prompt-disk.md`.
 
 ## Where the boot stops now
 
@@ -627,6 +628,11 @@ cd build/output/RelWithDebInfo && DISPLAY=:1 ./motion +set skipLauncher 1 +set s
 | `+set gf2RetraceHz 60` | The GF2 vertical retrace rate, on Multibus IRQ 3. **0 turns the interrupt off**, which is the quickest way to separate a fault in the retrace path from one behind it. |
 | `+set logMouse 1` | Every host movement with the backlog it joined, every fiftieth tick the guest acknowledges, and every cursor draw and undraw with the glyph's sixteen words. Cheap - unlike `logGF2`, it does not slow the machine down. |
 | `+set logKeyboard 1` | Every make and break code the emulated keyboard sends, with its scancode. |
+| `+set enableStorager 1` | Fit the Interphase Storager (`sii0`). **On by default** - a real 3130 has one, and with no image attached it costs three lines in the probe list and nothing else. |
+| `+set profileDisk1Path 3130-si0.img` | The disk image on `si0`. Defaults to a name that does not exist, so no drive is attached. |
+| `+set enableDSD 0` | Leave the DSD 5217 out. Needed for a *pure* 3130 - with both fitted, root moves to si0a but swap stays on md0b, because `setroot()` only takes a strictly larger swap partition than the one it already has. |
+| `+set bootDevice sd` | Which device the **PROM** loads the kernel from, by name: `md` (default, DSD disk), `sd` (Storager disk), `mf`/`sf` floppies, `mt`/`st` tapes, `ip`, `xns`, `prom`, `eprom`. Previously hardcoded to md. |
+| `+set logStorager 1` | One line per command the Storager executes, with its CHS, its Multibus buffer and its length. |
 | `+set numBitplanes 8` | How many bitplanes BP3 fits. The GF2 pixel readback answers `gl_getplaneinfo` from this, so IRIX believes it. Default 32, which IRIX caps to twelve usable. |
 | `+set dumpAfterSeconds 35` | Same dump, on a stopwatch instead. Useful because the interesting moments are usually the ones the guest says nothing about — a boot that goes quiet has no console line to match on. |
 | `+set consoleInput 'echo hi\n\p9ls /\n'` + `+set consoleInputAfterSeconds 14` | Types at the guest console. `\n`, `\r`, `\t`, `\\` and `\xNN` work; `\pN` waits N seconds before sending the rest (N is a single digit, so chain `\p9\p9` for longer), which is what makes a conversation possible. |
@@ -867,13 +873,28 @@ somewhere unexpected, this is the first thing to re-check. The graphics console 
 drives it with `xdotool` instead. The mouse is wired up now; what is not is any way to drive it from a script, so every mouse test
 here goes through `xdotool`.
 
-No Ethernet, no Interphase SMD or Storager, no FPA, no tape or floppy. **The DSD write path works
-now** - the guest can write to `md0`, and `/etc/fsck` repairs its own filesystem - which means the
-machine has to be allowed to `sync` before it is stopped, and that two emulators on one image will
-really corrupt it. **`resume-prompt-disk.md` is the handoff for storage**; the Storager is what is
-left of it, and it is what would make this machine a 3130 rather than a 3115. Installation media does exist after all - the GL2-W3.6
-tapes in `~/repos/sgiresearch/iris3000` - but nothing needs installing, because `/usr` on `md0c` is
-the same release and already complete. See the GUI section above.
+No Ethernet, no Interphase SMD, no FPA, no tape or floppy. **Both disk controllers work both ways** -
+the DSD 5217 (`md0`) and the Interphase Storager (`si0`) - and `/etc/fsck` repairs its own filesystem
+on either, which means the machine has to be allowed to `sync` before it is stopped, and that two
+emulators on one image will really corrupt it. **`resume-prompt-disk.md` is the handoff for
+storage**; what is left of it is the tape and floppy halves of the Storager, `si1`, and formatting.
+Installation media does exist after all - the GL2-W3.6 tapes in `~/repos/sgiresearch/iris3000` - but
+nothing needs installing, because `/usr` on `md0c` is the same release and already complete. See the
+GUI section above.
+
+**The machine can be a real 3130 now.** With the Storager fitted and the DSD left out, the PROM loads
+the kernel off `sd.0`, root is `si0a`, swap is `si0b`, `/usr` is `si0f` and `uname -t` says `3130` -
+which it could not while the disk was on a DSD, because `/etc/brc` maps `3020|3115` to `md0a`/`md0c`
+and only `3030|3120B|3130` to `si0a`/`si0f`. `scratch/runsii` runs it:
+
+```bash
+cd scratch/runsii
+./motion +set skipLauncher 1 +set startPaused 0 \
+         +set profileDisk1Path 3130-si0.img +set bootDevice sd +set enableDSD 0
+```
+
+The default configuration is unchanged - no arguments still gives the 3115 booting off md0a, with the
+Storager probing alive and reporting no drive.
 
 `AddrSpace::GetMapping` linear-scans an `unordered_map` on every access. `Memory::Start` still writes
 a fake reset vector into RAM at 0 that nothing needs any more. The RTC has 50 bytes of battery backed

@@ -312,9 +312,9 @@ namespace Motion
 
     private: 
         // Multibus IRQ1 is used.
-        Multibus* multibus;
-        FileStream* hdd;
-        CoherentExtensionDSD5217* dsdExtension;
+        Multibus* multibus = nullptr;
+        FileStream* hdd = nullptr;
+        CoherentExtensionDSD5217* dsdExtension = nullptr;
 
         WUB wub = {0};
         CCB ccb = {0};

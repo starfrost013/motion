@@ -2,6 +2,76 @@
 
 namespace Motion
 {
+    Cvar* bootDevice;
+
+    /*
+        Which device the PROM loads the kernel from. The PROM's own help text names them:
+
+            "sd(or si) - storager disk."   "st(or sq) - storager cartridge tape."
+            "sf        - storager floppy disk."
+
+        so a machine whose only disk hangs off a Storager wants sd here. md, the DSD winchester, is
+        the default because that is the controller the shipped disk image is labelled for.
+    */
+    struct BootDeviceName
+    {
+        const char* name;
+        uint16_t value;
+    };
+
+    static const BootDeviceName bootDeviceNames[] =
+    {
+        { "hdd",     SWITCH_BOOT_DEFAULT_HDD },      // whatever the PROM considers the default
+        { "tape",    SWITCH_BOOT_DEFAULT_TAPE },
+        { "floppy",  SWITCH_BOOT_DEFAULT_FLOPPY },
+        { "xns",     SWITCH_BOOT_DEFAULT_XNS },
+        { "prom",    SWITCH_BOOT_PROM_MONITOR },
+        { "eprom",   SWITCH_BOOT_EPROM_BOARD },
+        { "ip",      SWITCH_BOOT_DEVICE_IP },        // Interphase 2190 SMD disk
+        { "st",      SWITCH_BOOT_DEVICE_ST },        // Storager cartridge tape
+        { "sf",      SWITCH_BOOT_DEVICE_SF },        // Storager floppy
+        { "sd",      SWITCH_BOOT_DEVICE_SD },        // Storager disk - si0 to the kernel
+        { "mt",      SWITCH_BOOT_DEVICE_MT },        // DSD tape
+        { "mf",      SWITCH_BOOT_DEVICE_MF },        // DSD floppy
+        { "md",      SWITCH_BOOT_DEVICE_MD },        // DSD winchester
+    };
+
+    void IP2Switches::Start()
+    {
+        AddrSpaceMapping mapping = AddrSpaceMapping();
+
+        mapping.component = this;
+        mapping.startAddr = SWITCH_ADDR;
+        mapping.endAddr = SWITCH_ADDR + 1;
+
+        AddrSpace::AddMapping(mapping);
+
+        switchExtension = new CoherentExtensionIP2Switches(this);
+        Coherent::RegisterExtension(switchExtension);
+
+        // setup reasonable defaults - this used to be left uninitialised, so which device the
+        // PROM tried to boot from was down to whatever happened to be in the heap that day.
+        switchState = (SWITCH_AUTOBOOT | SWITCH_BOOT_DEVICE_MD);
+
+        bootDevice = Cvar::Get("bootDevice", "md");
+
+        for (const BootDeviceName& entry : bootDeviceNames)
+        {
+            if (strcmp(bootDevice->GetString(), entry.name))
+                continue;
+
+            switchState = (switchState & ~SWITCH_BOOT_TYPE) | (entry.value << SWITCH_BOOT_TYPE_END);
+
+            Logger::Log(LOG_PREFIX_IP2SWITCHES, std::format("Boot device switch set to {} (0x{:x})",
+                entry.name, entry.value).c_str());
+            return;
+        }
+
+        Logger::Log(LOG_PREFIX_IP2SWITCHES, std::format("+set bootDevice {} is not a device this PROM knows about - "
+            "staying on md. Try one of hdd, tape, floppy, xns, prom, eprom, ip, st, sf, sd, mt, mf, md.",
+            bootDevice->GetString()).c_str(), LogChannels::Warning);
+    }
+
     //
     // STATUS REG 
     //

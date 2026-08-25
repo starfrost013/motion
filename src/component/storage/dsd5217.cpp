@@ -23,8 +23,26 @@
 
 namespace Motion
 {
+    Cvar* enableDSD;
+
     void DSD5217::Start()
     {
+        /*
+            Fitted by default, because this is the controller the shipped disk image is labelled for
+            and the one the boot switch points at. Turning it off is what makes a *pure* 3130
+            possible: with a Storager fitted instead (+set bootDevice sd) the machine has no DSD at
+            all, which is the configuration a real 3130 shipped in - and it is the only way swap ends
+            up on si0b, because setroot() keeps the first swap partition it finds of a given size and
+            md0 is probed first.
+        */
+        enableDSD = Cvar::Get("enableDSD", "1");
+
+        if (!enableDSD->GetValue())
+        {
+            Logger::Log(DSD5217_LOG_PREFIX, "DSD 5217 is not fitted. +set enableDSD 1 to fit the board.");
+            return;
+        }
+
         multibus = Emulation::GetMachine()->FindComponentByType<Multibus>();
 
         /*
@@ -679,7 +697,10 @@ namespace Motion
 
     void DSD5217::Shutdown()
     {
+        // Both are null when the board was never fitted.
         delete dsdExtension;
-        Profile::Close(hdd);
+
+        if (hdd)
+            Profile::Close(hdd);
     }
 };

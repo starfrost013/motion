@@ -26,6 +26,7 @@
 #include <component/gpu/juniper/uc4/uc4.hpp>
 #include <component/gpu/juniper/bp3/bp3.hpp>
 #include <component/storage/dsd5217.hpp>
+#include <component/storage/storager2.hpp>
 
 namespace Motion
 {
@@ -52,6 +53,7 @@ namespace Motion
         AddComponent<DC4>();
         AddComponent<UC4>();
         AddComponent<DSD5217>();
+        AddComponent<Storager2>();
 
         forceEnterSerialMonitor = Cvar::Get("forceEnterSerialMonitor", "0");
 

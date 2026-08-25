@@ -105,6 +105,10 @@ namespace Motion
             static void PushPeek() { peekDepth++; };
             static void PopPeek() { if (peekDepth) peekDepth--; };
 
+            /// @brief True while the current read is the debugger's rather than the machine's. A
+            /// device register with a read side effect has to ask, or the debugger drives the device.
+            static bool IsPeeking() { return peekDepth > 0; };
+
             static void SignalFault(size_t addr, bool isWrite);
             static void SignalFaultIfDeviceSpace(size_t addr, bool isWrite);
             static void ClearFault() { faultPending = false; };

@@ -63,7 +63,6 @@ namespace Motion
                 break; 
             case 1: 
                 hddPath = profileDisk1Path->GetString();
-                hdd = Profile::Open(hddPath, flags);
                 break;
             default:
                 Logger::Log(PROFILE_LOG_PREFIX, "Profile::OpenDisk - Only 2 HDDs are supported!");

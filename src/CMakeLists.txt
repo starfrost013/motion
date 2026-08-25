@@ -79,5 +79,6 @@ add_executable(motion
     component/storage/dsd5217.cpp
     base/profile/profile_cvars.cpp
     component/storage/dsd5217_debug.cpp
+    component/storage/storager2.cpp
 )
 
