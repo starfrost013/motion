@@ -46,7 +46,7 @@ namespace Motion
         CoherentEditor::Settings settings;
         settings.buf = ram;
         settings.bufSize = capacity;
-        settings.name = "Memory Editor";
+        settings.name = "Memory Viewer";
 
         CoherentEditor* editor = new CoherentEditor(this, settings);
         Coherent::RegisterExtension(editor);
