@@ -18,7 +18,7 @@ namespace Motion
         Coherent::RegisterExtension(switchExtension);
 
         // setup reasonable defaults for the switch register
-        switchDefaultValue = Cvar::Get("switchDefaultValue", "f"); // hex value
+        switchDefaultValue = Cvar::Get("switchDefaultValue", "001f"); // hex value
 
         switchState = static_cast<uint16_t>(strtoul(switchDefaultValue->GetString(), NULL, 16));
     };

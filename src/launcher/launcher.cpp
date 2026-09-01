@@ -60,26 +60,32 @@ namespace Motion
 
     void Launcher::RenderGridItem(ImVec2 size, Cvar* cvar, GridCvarType type, const char* friendlyName)
     {
+        if (!cvar)
+            return;
+
         if (ImGui::BeginChild("##gridItem", size))
         {
-            // MENU BAR
-
             const char* name = cvar->GetName();
+            float floatValue = cvar->GetValue();
+
+            // DISGUSTING hack 0.01 seconds before 0.2.0-rc1
+            int32_t intValue = static_cast<int32_t>(floatValue);
+            bool boolValue = static_cast<bool>(floatValue);
+
             ImGui::Text("%s: ", friendlyName); 
             ImGui::SameLine();
 
             bool checkboxHit = false; 
-            int32_t intValue = 0;
-            float floatValue = 0;
             char buf[STRING_MAX_CVAR] = {0};
 
             char nameBuf[STRING_MAX_SHORT];
-
+            
+            // WARNING: This Code SUCSK!
             switch (type)
             {
                 case GridCvarType::Boolean:
                     snprintf(nameBuf, STRING_MAX_SHORT, "##Checkbox%d", lastImguiNum);
-                    if (ImGui::Checkbox(nameBuf, &checkboxHit))
+                    if (ImGui::Checkbox(nameBuf, &boolValue))
                     {
                         // because our crappy cvar api depends on strings we have to do this
                         (checkboxHit) ? Cvar::Set(name, "1") : Cvar::Set(name, "0");
@@ -88,23 +94,17 @@ namespace Motion
                 case GridCvarType::Integer:
                     snprintf(nameBuf, STRING_MAX_SHORT, "##IntEntry%d", lastImguiNum);
                     if (ImGui::InputInt(nameBuf, &intValue))
-                    {
-                        
-                    }
+                        Cvar::Set(name, std::to_string(intValue).c_str());
                     break;
                 case GridCvarType::Float:
                     snprintf(nameBuf, STRING_MAX_SHORT, "##FloatEntry%d", lastImguiNum);
                     if (ImGui::InputFloat(nameBuf, &floatValue))
-                    {
-                        
-                    }
+                        Cvar::Set(name, std::to_string(floatValue).c_str());
                     break;
                 case GridCvarType::String:
                     snprintf(nameBuf, STRING_MAX_SHORT, "##StringEntry%d", lastImguiNum);
-                    if (ImGui::InputTextWithHint(nameBuf, "String value...", buf, STRING_MAX_LONG, ImGuiInputTextFlags_EnterReturnsTrue))
-                    {
+                    if (ImGui::InputTextWithHint(nameBuf, cvar->GetString(), buf, STRING_MAX_LONG, ImGuiInputTextFlags_EnterReturnsTrue))
                         Cvar::Set(name, buf);
-                    }
                     break;
             }
 
@@ -159,6 +159,8 @@ namespace Motion
             RenderGridItem(gridEntrySize, logDestinations, GridCvarType::Integer, "Log Destination Mask");
             ImGui::SameLine();
             RenderGridItem(gridEntrySize, profileDisk0Path, GridCvarType::String, "Disk 0 Path");
+            ImGui::SameLine();
+            RenderGridItem(gridEntrySize, profileDisk1Path, GridCvarType::String, "Disk 1 Path");
 
             ImGui::NewLine();
             if (ImGui::Button("Go"))

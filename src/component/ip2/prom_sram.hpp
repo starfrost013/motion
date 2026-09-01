@@ -63,7 +63,7 @@ namespace Motion
             CoherentEditor::Settings settings;
             settings.buf = sram;
             settings.bufSize = SRAM_SIZE;
-            settings.name = "SRAM Editor";
+            settings.name = "SRAM Viewer";
 
             editor = new CoherentEditor(this, settings);
             Coherent::RegisterExtension(editor);
