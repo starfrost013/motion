@@ -183,9 +183,6 @@ namespace Motion
                             Coherent::currentSystem->SetRunState(CoherentSystem::RunState::SingleStepNormal);
                         
                         ImGui::SameLine();
-
-                        if (ImGui::Button("Step Over"))
-                            Coherent::currentSystem->SetRunState(CoherentSystem::RunState::SingleStepOver);
                     }
 
                     ImGui::SameLine();
