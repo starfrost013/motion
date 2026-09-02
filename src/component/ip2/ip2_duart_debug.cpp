@@ -6,6 +6,7 @@ namespace Motion
     // Persistent per-line input boxes for the "type into this port" harness below. Indexed by serial line number
     // (see DUART68681::GetLineIndex) rather than being function-local statics, since each line needs its own buffer.
     static char rxInputBuf[SERIAL_MAX_LINES][STRING_MAX_LONG] = {0};
+    static float rxOutputHeight[SERIAL_MAX_LINES] = {0.0f};
 
     void CoherentExtensionDUART68681::DrawStatusFlag(const char* name, bool set, bool badWhenSet)
     {
@@ -23,9 +24,13 @@ namespace Motion
     /// @param outputHeight Height of the scrolling output area.
     void CoherentExtensionDUART68681::DrawConsole(SerialLine& line, int32_t lineNum, float outputHeight)
     {
+        if (rxOutputHeight[lineNum] <= 0.0f)
+            rxOutputHeight[lineNum] = outputHeight;
+
         ImGui::PushID(lineNum);
 
-        ImGui::BeginChild("output", ImVec2(-1, outputHeight), true);
+        ImGui::BeginChild("output", ImVec2(-1, rxOutputHeight[lineNum]), ImGuiChildFlags_Borders | ImGuiChildFlags_ResizeY);
+        rxOutputHeight[lineNum] = ImGui::GetWindowSize().y;
         ImGui::TextUnformatted(line.GetTxLog().c_str());
         ImGui::SetScrollHereY(1.0f);
         ImGui::EndChild();
