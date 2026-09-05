@@ -53,6 +53,8 @@ namespace Motion
 
     void MC68020::Reset()
     {
+        AddrSpace::SetFaultsEnabled(false);
+
         Logger::Log(LOG_PREFIX_68020, "Resetting CPU...");
 
         // ignore autovectors. THe IP2 reads out of PROM U118 to determine what vectors to call  on interrupts
