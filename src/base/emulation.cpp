@@ -103,7 +103,7 @@ namespace Motion
     void Emulation::Tick()
     {
         // reset first
-        machine->Reset();
+        Reset();
 
         while (running)
         {
