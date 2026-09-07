@@ -7,7 +7,6 @@
     gf2_coordinator.cpp: The code for the gf2 coordinator
 */
 
-#pragma once
 #include <component/component.hpp>
 #include <component/multibus/multibus.hpp>
 #include <component/gpu/juniper/gf2/gf2_coordinator.hpp>
@@ -26,10 +25,10 @@ namespace Motion
         ge.Start();
         fbc.Start();
 
-        // GF
+        // map gf2
         Multibus::SlotMapping mapping = Multibus::SlotMapping(this);
-        mapping.ioStart = GF2FAKE_START;
-        mapping.ioEnd = GF2FAKE_END;
+        mapping.ioStart = GF2_MULTIBUS_START;
+        mapping.ioEnd = GF2_MULTIBUS_END;
         mapping.id = GF2_MULTIBUS_SLOT;
 
         multibus->AddSlotMapping(mapping);

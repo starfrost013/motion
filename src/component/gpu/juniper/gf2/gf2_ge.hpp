@@ -13,8 +13,8 @@
 
 namespace Motion
 {
-    #define GF2FAKE_START           0x50002000
-    #define GF2FAKE_END             0x50002FFF
+    #define GF2_MULTIBUS_START           0x50002000
+    #define GF2_MULTIBUS_END             0x50002FFF
 
     #define GF2_PRIVATE_BUS_START   0x60000000
     #define GF2_PRIVATE_BUS_END     0x60001FFF

@@ -16,7 +16,7 @@ namespace Motion
 {    
     Cvar* disableGfx; 
 
-    class GF2Coordinator : Component
+    class GF2Coordinator : public Component
     {
     public: 
         void Start() override; 
