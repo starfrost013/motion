@@ -11,12 +11,19 @@
 
 #pragma once
 #include <component/component.hpp>
+#include <component/gpu/juniper/gf2/am2903/am2903.hpp>
 
 namespace Motion
 {
-    class GF2FBC : public Component 
+    class GF2FBC
     {
     public: 
+        void Start();
+        void Tick();
+
         const char* GetName() { return "Framebuffer & Bitplane Controller (AMD Am2903)"; }; 
+        
+    private:
+        AM2903 Am2903; 
     }; 
 }; 

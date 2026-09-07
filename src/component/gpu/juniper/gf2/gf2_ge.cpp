@@ -26,33 +26,10 @@
 
 namespace Motion
 {
-    Cvar* fakeGF2; 
 
     void GF2GE::Start()
     {
-        fakeGF2 = Cvar::Get("fakeGF2", "0");
 
-        if (!fakeGF2->GetValue())
-            return;
-
-        Logger::Log(GF2_GE_LOG_PREFIX, "Initialising FAKE GF2 board for PROM graphical mode testing");
-
-        multibus = Emulation::GetMachine()->FindComponentByType<Multibus>();
-
-        // GF
-        Multibus::SlotMapping mapping = Multibus::SlotMapping(this);
-        mapping.ioStart = GF2FAKE_START;
-        mapping.ioEnd = GF2FAKE_END;
-        mapping.id = GF2_MULTIBUS_SLOT;
-
-        multibus->AddSlotMapping(mapping);
-        
-        AddrSpaceMapping privMapping = AddrSpaceMapping();
-        privMapping.startAddr = GF2_PRIVATE_BUS_START;
-        privMapping.endAddr = GF2_PRIVATE_BUS_END;
-        privMapping.component = this;
-
-        AddrSpace::AddMapping(privMapping);
     }
 
     void GF2GE::Tick()

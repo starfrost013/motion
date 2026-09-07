@@ -214,6 +214,10 @@ Similar to a .plan file
 * start splitting off reset from shutdown 
 * get rid of ridiculous hack where we manually bitbanged the address into the memory and make it machine specific
 
+## 2026-09-04 to 2026-09-05
+* made reset much less of an invasive process
+    * it doesn't shut down and reinitialise the emualtor but just runs the reset method fo all components
+    
 v0.3.0 TODO:
 
 * GE and FBC!!!!!!!

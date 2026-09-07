@@ -5,6 +5,8 @@ Release Notes
 
 0.3.0
 
+    * reset process is much less invasive, it just resets components rather than shutting down and rebooting the emulator
+
 0.2.0 (September 1, 2026)
 ** Motion can now boot GL2 Unix in serial mode only. A disk image is provided at: xxxxx**
 

@@ -24,8 +24,7 @@
 #include <component/gpu/juniper/uc4/uc4.hpp>
 #include <component/gpu/juniper/bp3/bp3.hpp>
 #include <component/storage/dsd5217.hpp>
-#include <component/gpu/juniper/gf2/gf2_fbc.hpp>
-#include <component/gpu/juniper/gf2/gf2_ge.hpp>
+#include <component/gpu/juniper/gf2/gf2_coordinator.hpp>
 
 namespace Motion
 {
@@ -50,8 +49,7 @@ namespace Motion
         AddComponent<DSD5217>();
         
         // add in reverse order
-        AddComponent<GF2FBC>();
-        AddComponent<GF2GE>();
+        AddComponent<GF2Coordinator>();
         AddComponent<IP2Mouse>();
 
         forceEnterSerialMonitor = Cvar::Get("forceEnterSerialMonitor", "0");

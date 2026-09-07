@@ -75,5 +75,7 @@ add_executable(motion
     component/storage/dsd5217_debug.cpp
     component/ip2/ip2_interrupt.cpp
     component/gpu/juniper/gf2/gf2_ge.cpp
+    component/gpu/juniper/gf2/gf2_fbc.cpp
+    component/gpu/juniper/gf2/gf2_coordinator.cpp
 )
 

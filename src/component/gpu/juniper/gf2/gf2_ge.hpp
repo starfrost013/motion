@@ -13,11 +13,6 @@
 
 namespace Motion
 {
-    /// @brief sets up a fake GF2 which is enough to not cause a bus error. enough to get into PROM monitor in graphical mode for e.g. debugging UC4/DC4
-    // THis makes no attempt to implement any functionality, just respond whe nteh bus accesses it
-    // ONLY in Version 0.2.x!
-    extern Cvar* fakeGF2; 
-
     #define GF2FAKE_START           0x50002000
     #define GF2FAKE_END             0x50002FFF
 
@@ -28,16 +23,15 @@ namespace Motion
 
     #define GF2_GE_LOG_PREFIX       "GF2 - Geometry Engine"
 
-    class GF2GE : public Component 
+    class GF2GE
     {
     public: 
         const char* GetName() { return "Geometry Engine Rev 2.0/2.5"; }; 
 
-        void Start() override;
-        void Tick() override;
+        void Start();
+        void Tick();
     private:
         GF2FBC* fbc; // needed for passthrough
 
-        Multibus* multibus; 
     }; 
 }; 
