@@ -77,5 +77,6 @@ add_executable(motion
     component/gpu/juniper/gf2/gf2_ge.cpp
     component/gpu/juniper/gf2/gf2_fbc.cpp
     component/gpu/juniper/gf2/gf2_coordinator.cpp
+    component/gpu/juniper/gf2/am2903/am2903_core.cpp
 )
 
