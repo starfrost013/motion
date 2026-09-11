@@ -6,10 +6,8 @@
 
     gf2_fbc.cpp: Non-Am2903 parts of the F.BC
 */
-#pragma once
-
 #include <component/component.hpp>
-#include <component/gpu/juniper/gf2/gf2_fbc.hpp>
+#include <component/gpu/juniper/gf2/gf2.hpp>
 
 namespace Motion
 {

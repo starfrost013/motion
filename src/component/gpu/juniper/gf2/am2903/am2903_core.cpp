@@ -1,4 +1,4 @@
-#include <component/gpu/juniper/gf2/gf2_coordinator.hpp>
+#include <component/gpu/juniper/gf2/am2903/am2903.hpp>
 
 namespace Motion
 {

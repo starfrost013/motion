@@ -24,7 +24,7 @@
 #include <component/gpu/juniper/uc4/uc4.hpp>
 #include <component/gpu/juniper/bp3/bp3.hpp>
 #include <component/storage/dsd5217.hpp>
-#include <component/gpu/juniper/gf2/gf2_coordinator.hpp>
+#include <component/gpu/juniper/gf2/gf2.hpp>
 
 namespace Motion
 {

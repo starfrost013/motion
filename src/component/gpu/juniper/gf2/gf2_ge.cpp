@@ -22,14 +22,14 @@
 
 #include <component/multibus/multibus.hpp>
 #include <component/memory.hpp>
-#include <component/gpu/juniper/gf2/gf2_ge.hpp>
+#include <component/gpu/juniper/gf2/gf2.hpp>
 
 namespace Motion
 {
 
     void GF2GE::Start()
     {
-
+        busy = false; 
     }
 
     void GF2GE::Tick()

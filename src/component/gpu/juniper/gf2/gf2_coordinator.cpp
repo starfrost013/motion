@@ -9,7 +9,7 @@
 
 #include <component/component.hpp>
 #include <component/multibus/multibus.hpp>
-#include <component/gpu/juniper/gf2/gf2_coordinator.hpp>
+#include <component/gpu/juniper/gf2/gf2.hpp>
 
 namespace Motion
 {
@@ -53,7 +53,7 @@ namespace Motion
 
     uint16_t GF2Coordinator::Read16(size_t addr) 
     {
-
+        return 0xFF;
     }
 
     uint32_t GF2Coordinator::Read32(size_t addr) 
