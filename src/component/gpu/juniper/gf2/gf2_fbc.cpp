@@ -14,5 +14,10 @@ namespace Motion
     void GF2FBC::Start()
     {
 
-    };
+    }
+
+    void GF2FBC::Tick()
+    {
+        
+    }
 }; 
