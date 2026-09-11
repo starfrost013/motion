@@ -14,15 +14,18 @@
 namespace Motion
 {
     Cvar* disableGfx;
-    
+
     void GF2Coordinator::Start()
     {
+
         disableGfx = Cvar::Get("disableGfx", "0");
 
         if (disableGfx->GetValue())
             return;
 
         Logger::Log(GF2_GE_LOG_PREFIX, "Initialising GF2...");
+        
+        multibus = Emulation::GetMachine()->FindComponentByType<Multibus>();
 
         ge.Start();
         fbc.Start();
@@ -32,6 +35,7 @@ namespace Motion
         mapping.ioStart = GF2_MULTIBUS_START;
         mapping.ioEnd = GF2_MULTIBUS_END;
         mapping.id = GF2_MULTIBUS_SLOT;
+        mapping.component = this;
 
         multibus->AddSlotMapping(mapping);
         
