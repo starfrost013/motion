@@ -13,6 +13,8 @@
 
 namespace Motion
 {
+    Cvar* disableGfx;
+    
     void GF2Coordinator::Start()
     {
         disableGfx = Cvar::Get("disableGfx", "0");

@@ -15,7 +15,7 @@
 
 namespace Motion
 {    
-    Cvar* disableGfx; 
+    extern Cvar* disableGfx; 
     
     class GF2FBC
     {
