@@ -25,11 +25,11 @@
         ]
     },
     {
-        "name": "Debug (No Keyboard) Linux64",
+        "name": "Debug (No GFX) Linux64",
         "type": "cppdbg",
         "request": "launch",
         "program": "${workspaceFolder}/build/output/Debug/motion",
-        "args": ["+set", "forceEnterSerialMonitor", "1"],
+        "args": ["+set", "disableGfx", "1"],
         "stopAtEntry": false,
         "cwd": "${workspaceFolder}/build/output/Debug",
         "environment": [],

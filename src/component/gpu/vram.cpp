@@ -27,8 +27,8 @@ namespace Motion
         settings.bufSize = GetCapacity();
         settings.name = "VRAM Editor";
 
-        CoherentEditor* editor = new CoherentEditor(this, settings);
-        Coherent::RegisterExtension(editor);
+        vramEditor = new CoherentEditor(this, settings);
+        Coherent::RegisterExtension(vramEditor);
         
     }
 
@@ -36,5 +36,6 @@ namespace Motion
     void ComponentVRAM::Shutdown()
     {
         delete[] vram;
+        delete vramEditor; 
     }
 }

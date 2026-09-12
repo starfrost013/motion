@@ -19,8 +19,8 @@ namespace Motion
 {    
     extern Cvar* disableGfx; 
 
-    #define GF2_FBC_DATA_START                      0x50002000
-    #define GF2_FBC_DATA_END                        0x500023FF
+    #define GF2_FBC_DATA_START                      0x50002800
+    #define GF2_FBC_DATA_END                        0x50002BFF
     #define GF2_FBC_FLAGS                           0x50002400 
 
     #define GF2_FBC_FLAGS_READ_GE_REQ_TO_FBC        (1 << 0)
@@ -139,6 +139,7 @@ namespace Motion
     {
     public: 
         void Start() override; 
+        void Shutdown() override; 
             
         uint8_t Read8(size_t addr) override;
         uint16_t Read16(size_t addr) override;
@@ -185,5 +186,7 @@ namespace Motion
 
         /// @brief get requested microcode slice for addr addr
         uint16_t GetRequestedFBCUcodeData(uint16_t addr) { return ucode[GetCurrentUcodeState(addr)][GetCurrentUcodeSlice()]; };
+
+        CoherentEditor* fbcUcodeEditor; 
     }; 
 }; 

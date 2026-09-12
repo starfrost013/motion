@@ -4,10 +4,11 @@ The SGI Emulator
 Release Notes
 
 0.3.0
-
     * reset process is much less invasive, it just resets components rather than shutting down and rebooting the emulator
+    * Fix VRAM editor causing a memory leak on close
 
-0.2.0 (September 1, 2026)
+
+0.2.0 (September 5, 2026)
 ** Motion can now boot GL2 Unix in serial mode only. A disk image is provided at: xxxxx**
 
     * Video scaling (thanks to flexion)
@@ -33,6 +34,7 @@ Release Notes
     * Assets are now in the assets folder
     * The last mapping read or written is now cached so we odn't have to linearly iterate through all mappings each time
     * Added ability to edit register values, click on them to edit them
+    * Added ability to scale system console window
     * DSD 5217 emulation (first version sucked, thanks danifunker)
     * IP2 interrupt emulation (thanks danifunker)
     * proper RTC emulation (thanks danifunker)

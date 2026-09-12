@@ -107,4 +107,10 @@ namespace Motion
         //ge.Tick();
         //fbc.Tick();
     }
+
+    void GF2::Shutdown()
+    {
+        if (fbcUcodeEditor)
+            delete fbcUcodeEditor;
+    }
 };
