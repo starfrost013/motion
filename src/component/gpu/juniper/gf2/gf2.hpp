@@ -64,7 +64,7 @@ namespace Motion
     #define GF2_GE_FLAG_WRITE_ENABLE_FBC_INT        (1 << 10)   // enable fbc program (microcode) int
     #define GF2_GE_FLAG_WRITE_ENABLE_AUTOCLEAR      (1 << 11)   // AUTO CLEAR fbc interrupts after writing
     #define GF2_GE_FLAG_FBC_CURRENT_STATE           (1 << 11) | (1 << 10) | (1 << 9)
-    #define GF2_GE_FLAG_FBC_SLICE_SHIFT             (1 << 13)   // FBC slice sift
+    #define GF2_GE_FLAG_FBC_SLICE_SHIFT             13          // FBC slice sift
     #define GF2_GE_FLAG_WRITE_ENABLE_UCODE_ACCESS   (1 << 15)   // Microcode access enabled
 
     #define GF2_MULTIBUS_END                        0x50002FFF
@@ -184,6 +184,6 @@ namespace Motion
         }
 
         /// @brief get requested microcode slice for addr addr
-        uint16_t GetRequestedFBCUcodeData(uint16_t addr) { return ucode[GetCurrentState(addr)][GetCurrentSlice()] };
+        uint16_t GetRequestedFBCUcodeData(uint16_t addr) { return ucode[GetCurrentState(addr)][GetCurrentSlice()]; };
     }; 
 }; 
