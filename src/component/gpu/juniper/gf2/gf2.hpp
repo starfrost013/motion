@@ -175,15 +175,15 @@ namespace Motion
         void FBCWrite16(size_t addr, uint16_t value);
 
         // should be good for gcc and clang 
-        __attribute__((always_inline)) uint16_t GetCurrentSlice() { return (geFlagsWritten >> GF2_GE_FLAG_FBC_SLICE_SHIFT) & 0x03; }; // calculate slice
+        __attribute__((always_inline)) uint16_t GetCurrentUcodeSlice() { return (geFlagsWritten >> GF2_GE_FLAG_FBC_SLICE_SHIFT) & 0x03; }; // calculate slice
 
-        __attribute__((always_inline)) uint16_t GetCurrentState(uint16_t addr)
+        __attribute__((always_inline)) uint16_t GetCurrentUcodeState(uint16_t addr)
         { 
             return (((geFlagsWritten & GF2_GE_FLAG_FBC_CURRENT_STATE) >> 1) 
             | (((addr - GF2_FBC_DATA_START) & GF2_FBC_UCODE_ADDR_MASK) >> 1));
         }
 
         /// @brief get requested microcode slice for addr addr
-        uint16_t GetRequestedFBCUcodeData(uint16_t addr) { return ucode[GetCurrentState(addr)][GetCurrentSlice()]; };
+        uint16_t GetRequestedFBCUcodeData(uint16_t addr) { return ucode[GetCurrentUcodeState(addr)][GetCurrentUcodeSlice()]; };
     }; 
 }; 
