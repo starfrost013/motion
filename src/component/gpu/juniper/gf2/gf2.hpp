@@ -5,6 +5,8 @@
     Copyright (c)2026 starfrost
 
     gf2_coordinator.hpp: The mappings for GF2 are messy as shit. So we map them to different components in here...
+
+    These are all implemented in one class because they are basically so connected to each other that there is no way of doing it
 */
 
 #pragma once
@@ -16,24 +18,9 @@
 namespace Motion
 {    
     extern Cvar* disableGfx; 
-    
-    class GF2FBC
-    {
-    public: 
-        void Start();
-        void Tick();
 
-        const char* GetName() { return "Framebuffer & Bitplane Controller (AMD Am2903)"; }; 
-        
-    private:
-        AM2903 Am2903; 
-    }; 
-
-    // sometimes it is x50001000 for BETA GF2 ????? 
-    // TOKEN means BUSY (SET == BUSY)
-
-    #define GF2_MULTIBUS_START                      0x50002000
-    // A10 LINE select s the registers
+    #define GF2_FBC_DATA_START                      0x50002000
+    #define GF2_FBC_DATA_END                        0x500023FF
     #define GF2_FBC_FLAGS                           0x50002400 
 
     #define GF2_FBC_FLAGS_READ_GE_REQ_TO_FBC        (1 << 0)
@@ -56,17 +43,29 @@ namespace Motion
     #define GF2_FBC_FLAGS_WRITE_FORCE_ACKNOWLEDGE   (1 << 5)           
     #define GF2_FBC_FLAGS_WRITE_FORCE_SUBST_IN      (1 << 6)           
     #define GF2_FBC_FLAGS_WRITE_FORCE_SUBST_OUT     (1 << 7)                    
+    // sometimes it is x50001000 for BETA GF2 ????? 
+    // TOKEN means BUSY (SET == BUSY)
 
-    #define GF2_FBC_DATA                            0x50002800  // A VERY IMPORTANT REGISTER
+    #define GF2_MULTIBUS_START                      0x50002000
+    // A10 LINE select s the registers
+
     #define GF2_GE_FLAGS                            0x50002C00
 
-    #define GF2_GE_FLAG_RESET                       (1 << 0)    // is the GE reset?
-    #define GF2_GE_FLAG_SUBST_BPC_CODE              (1 << 1)    // replace BPC command bits [0.3] with whatever is the di bus
-    #define GF2_GE_FLAG_ENABLE_FIFO_INT             (1 << 2)    // enable fifo int
-    #define GF2_GE_FLAG_ENABLE_VERT_INT             (1 << 3)    // enable vert int
-    #define GF2_GE_FLAG_ENABLE_FBC_INT              (1 << 10)   // enable fbc program (microcode) int
-    #define GF2_GE_FLAG_ENABLE_AUTOCLEAR            (1 << 11)   // AUTO CLEAR fbc interrupts after writing
-    #define GF2_GE_FLAG_ENABLE_UCODE_ACCESS         (1 << 15)   // Microcode access enabled
+    #define GF2_GE_FLAG_READ_LOWATER                (1 << 0)    // Input FIFo lowater mark
+    #define GF2_GE_FLAG_READ_INT_TRAP               (1 << 1)    // GE instruction trap
+    #define GF2_GE_FLAG_READ_INT_FIFO               (1 << 2)    // Input fifo interrupt (lo OR hi water hit)
+    #define GF2_GE_FLAG_GE_TRAPPED(n)               (1 << (n+2))// GE n trapped 
+    #define GF2_GE_FLAG_READ_HIWATER                (1 << 15)   // Input FIFo lowater mark
+
+    #define GF2_GE_FLAG_WRITE_RESET                 (1 << 0)    // is the GE reset?
+    #define GF2_GE_FLAG_WRITE_SUBST_BPC_CODE        (1 << 1)    // replace BPC command bits [0.3] with whatever is the di bus
+    #define GF2_GE_FLAG_WRITE_ENABLE_FIFO_INT       (1 << 2)    // enable fifo int
+    #define GF2_GE_FLAG_WRITE_ENABLE_VERT_INT       (1 << 3)    // enable vert int
+    #define GF2_GE_FLAG_WRITE_ENABLE_FBC_INT        (1 << 10)   // enable fbc program (microcode) int
+    #define GF2_GE_FLAG_WRITE_ENABLE_AUTOCLEAR      (1 << 11)   // AUTO CLEAR fbc interrupts after writing
+    #define GF2_GE_FLAG_FBC_CURRENT_STATE           (1 << 11) | (1 << 10) | (1 << 9)
+    #define GF2_GE_FLAG_FBC_SLICE_SHIFT             (1 << 13)   // FBC slice sift
+    #define GF2_GE_FLAG_WRITE_ENABLE_UCODE_ACCESS   (1 << 15)   // Microcode access enabled
 
     #define GF2_MULTIBUS_END                        0x50002FFF
 
@@ -130,19 +129,13 @@ namespace Motion
     #define GE_CMD_CURVEPOLY		                0x37
     #define GE_CMD_TRANSFORMPOINT	                0x38
 
-    class GF2GE
-    {
-        friend class GF2Coordinator;
-        
-    public: 
-        void Start();
-        void Tick();
-    private:
-        GF2FBC* fbc; // needed for passthrough
-        bool busy;  // token is passing through
-    }; 
+    #define GF2_FBC_UCODE_STATES                    4096
+    #define GF2_FBC_UCODE_SLICES                    4
+    // 16 bit (4096 states * 4 am2903s * 4 bits per am2903) bits = 0x400, mst be 16 bit aligned = 0x3fe
+    #define GF2_FBC_UCODE_ADDR_MASK                 0x3FE
 
-    class GF2Coordinator : public Component
+
+    class GF2 : public Component
     {
     public: 
         void Start() override; 
@@ -155,11 +148,42 @@ namespace Motion
         void Write32(size_t addr, uint32_t value) override; 
 
         void Tick() override;
+    
+        void GEExecuteCommand();
 
         const char* GetName() { return "GF2 Board Coordinator (GE+FBC)"; }; 
     private: 
         Multibus* multibus;
-        GF2GE ge;
-        GF2FBC fbc;
+
+        bool geBusy;  // token is passing through
+
+        bool geReset = true; 
+
+        uint16_t geFlagsRead;
+        uint16_t geFlagsWritten;
+        uint16_t fbcFlags; 
+
+        // FBC SHIT
+        AM2903 am2903; 
+        uint16_t ucode[GF2_FBC_UCODE_STATES][GF2_FBC_UCODE_SLICES]; // 16kb 
+
+        void GEStart();
+        void FBCStart();
+        uint16_t GERead16(size_t addr);
+        uint16_t FBCRead16(size_t addr);
+        void GEWrite16(size_t addr, uint16_t value);
+        void FBCWrite16(size_t addr, uint16_t value);
+
+        // should be good for gcc and clang 
+        __attribute__((always_inline)) uint16_t GetCurrentSlice() { return (geFlagsWritten >> GF2_GE_FLAG_FBC_SLICE_SHIFT) & 0x03; }; // calculate slice
+
+        __attribute__((always_inline)) uint16_t GetCurrentState(uint16_t addr)
+        { 
+            return (((geFlagsWritten & GF2_GE_FLAG_FBC_CURRENT_STATE) >> 1) 
+            | (((addr - GF2_FBC_DATA_START) & GF2_FBC_UCODE_ADDR_MASK) >> 1));
+        }
+
+        /// @brief get requested microcode slice for addr addr
+        uint16_t GetRequestedFBCUcodeData(uint16_t addr) { return ucode[GetCurrentState(addr)][GetCurrentSlice()] };
     }; 
 }; 

@@ -15,9 +15,8 @@ namespace Motion
 {
     Cvar* disableGfx;
 
-    void GF2Coordinator::Start()
+    void GF2::Start()
     {
-
         disableGfx = Cvar::Get("disableGfx", "0");
 
         if (disableGfx->GetValue())
@@ -27,8 +26,8 @@ namespace Motion
         
         multibus = Emulation::GetMachine()->FindComponentByType<Multibus>();
 
-        ge.Start();
-        fbc.Start();
+        GEStart();
+        FBCStart();
 
         // map gf2
         Multibus::SlotMapping mapping = Multibus::SlotMapping(this);
@@ -49,7 +48,7 @@ namespace Motion
     
     // BIG ENDIAN! WE DO NOT USE MULTIBUS MEMORY SO WE DON'T NEED TO FLIP
 
-    uint8_t GF2Coordinator::Read8(size_t addr) 
+    uint8_t GF2::Read8(size_t addr) 
     {
         if (addr & 1)
             return (uint8_t)(Read16(addr & ~1) & 0x0000FFFF);
@@ -57,17 +56,21 @@ namespace Motion
             return (Read16(addr) & 0xFFFF0000) >> 8;
     }
 
-    uint16_t GF2Coordinator::Read16(size_t addr) 
+    uint16_t GF2::Read16(size_t addr) 
     {
-        return 0xFF;
+        if (addr >= GF2_PRIVATE_BUS_START
+        || addr == GF2_GE_FLAGS)
+            return GERead16(addr);
+
+        return FBCRead16(addr);
     }
 
-    uint32_t GF2Coordinator::Read32(size_t addr) 
+    uint32_t GF2::Read32(size_t addr) 
     {
         return ((uint32_t)Read16(addr) << 16) + (Read16(addr + 2));
     }
 
-    void GF2Coordinator::Write8(size_t addr, uint8_t value) 
+    void GF2::Write8(size_t addr, uint8_t value) 
     {
         uint16_t val = Read16(addr);
 
@@ -80,20 +83,28 @@ namespace Motion
         Write16(addr, val);
     }
 
-    void GF2Coordinator::Write16(size_t addr, uint16_t value) 
+    void GF2::Write16(size_t addr, uint16_t value) 
     {
+        if (addr >= GF2_PRIVATE_BUS_START
+        || addr == GF2_GE_FLAGS)
+        {
+            GEWrite16(addr, value);
+            return;
+        }
 
+        FBCWrite16(addr, value);
     }
     
-    void GF2Coordinator::Write32(size_t addr, uint32_t value)  
+    void GF2::Write32(size_t addr, uint32_t value)  
     {
         Write16(addr, (value & 0xFFFF0000) >> 16);
         Write16(addr + 2, (value & 0x0000FFFF));
     }
 
-    void GF2Coordinator::Tick() 
+    void GF2::Tick() 
     {
-        ge.Tick();
-        fbc.Tick();
+        // TEMP !!!
+        //ge.Tick();
+        //fbc.Tick();
     }
 };

@@ -217,6 +217,13 @@ Similar to a .plan file
 ## 2026-09-04 to 2026-09-05
 * made reset much less of an invasive process
     * it doesn't shut down and reinitialise the emualtor but just runs the reset method fo all components
+
+took a big break, preventative to stop burnout
+
+## 2026-09-12
+* microcode loading
+* merged ge and fbc 
+* added getcurrentslice, getcurrentstate
     
 v0.3.0 TODO:
 

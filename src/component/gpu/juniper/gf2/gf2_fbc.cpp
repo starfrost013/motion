@@ -11,13 +11,15 @@
 
 namespace Motion
 {
-    void GF2FBC::Start()
+    uint16_t GF2::FBCRead16(size_t addr)
     {
-
+        if (addr >= GF2_FBC_DATA_START && addr <= GF2_FBC_DATA_END)
+            return GetRequestedFBCUcodeData(addr);
     }
 
-    void GF2FBC::Tick()
+    void GF2::FBCWrite16(size_t addr, uint16_t value)
     {
         
     }
+
 }; 

@@ -49,7 +49,7 @@ namespace Motion
         AddComponent<DSD5217>();
         
         // add in reverse order
-        AddComponent<GF2Coordinator>();
+        AddComponent<GF2>();
         AddComponent<IP2Mouse>();
 
         forceEnterSerialMonitor = Cvar::Get("forceEnterSerialMonitor", "0");

@@ -27,13 +27,44 @@
 namespace Motion
 {
 
-    void GF2GE::Start()
+    void GF2::GEStart()
     {
-        busy = false; 
+        geBusy = false; 
+        geReset = false; 
     }
 
-    void GF2GE::Tick()
+    uint16_t GF2::GERead16(size_t addr)
     {
-        
+        uint16_t val = 0x00; 
+
+        switch (addr)
+        {
+            case GF2_GE_FLAGS:
+                val = geFlagsRead;
+
+                if (geReset)
+                    val |= GF2_GE_FLAG_WRITE_RESET;
+                else    
+                    val &= ~(GF2_GE_FLAG_WRITE_RESET);
+                break;
+        }
+
+        return val; 
+
+    }
+
+    void GF2::GEWrite16(size_t addr, uint16_t value)
+    {
+        switch (addr)
+        {
+            case GF2_GE_FLAGS:
+                geFlagsWritten = value; 
+                break; 
+        }
+    }
+
+    void GF2::GEExecuteCommand()
+    {
+
     }
 }
