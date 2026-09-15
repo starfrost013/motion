@@ -46,9 +46,10 @@ namespace Motion
     }
 
     /*
-        The eight Multibus interrupt lines are shared, open collector, and they do not map one to one
-        onto the CPU's seven levels - 0 and 1 both come out on level 1. The IP2 interrupt logic owns
-        that mapping and the priority decode, so just hand the line state over.
+        Multibus interrupt lines:
+            0, 1        68020 Level 1
+            2 to 5      68020 same level
+            6 and 7     Controlled by IP2 interrupt board, the priority decoding is done in ip2_interrupt.cpp
     */
     void Multibus::SetMultibusIRQ(int32_t number, bool asserted)
     {

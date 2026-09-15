@@ -3,6 +3,7 @@
     The SGI Emulator
 
     Copyright (c)2026 danifunker
+    Copyright (c)2026 starfrost
 
     dsd5217.hpp: The Qualogy (previously known as Data Systems Design) DSD 5217 Multibus Disk & Tape Controller
     This is a combined QIC tape, hard drive and floppy controller.
@@ -10,7 +11,7 @@
     Technically not used on the 3130 (3120) but this is the only controller that I've got a disk image for right now
     Later on we can run mkboot and boot this
 
-    Currently this is a high-level emulation, but this uses the Intel 8085. Later on we'll write an 8085 emulation.
+    Currently this is a high-level emulation, but the real controller runs firmware on an Intel 8085. Later on we'll write an 8085 emulation core and LLE it.
 
     The controller is a Multibus BUS MASTER and only decodes its single programmed I/O port.
     The wake-up block, channel control block, controller invocation block, I/O parameter block and every
@@ -269,17 +270,17 @@ namespace Motion
         /// @brief format related/
         struct FMTB
         {
-            uint8_t pattern1;
-            uint8_t function;               // format function
-            uint8_t pattern3;
-            uint8_t pattern2;
-            uint8_t interleave;
-            uint8_t pattern4;
+            uint8_t pattern1;                   // +0
+            uint8_t function;                   // +1, format function
+            uint8_t pattern3;                   // +2
+            uint8_t pattern2;                   // +3
+            uint8_t interleave;                 // +4
+            uint8_t pattern4;                   // +5
         }; 
 
         #define DSD5217_SB_SIZE                 14
     
-        // Status bytes for operation?
+        // Status bytes for operation
         #define DSD5217_SB_HARD_ERROR0          0
         #define DSD5217_SB_HARD_ERROR1          1
         #define DSD5217_SB_SOFT_ERROR           2

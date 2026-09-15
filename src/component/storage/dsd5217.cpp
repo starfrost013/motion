@@ -2,8 +2,8 @@
     m  o  t  i  o  n
     The SGI Emulator
 
-    Copyright (c)2026 starfrost
     Copyright (c)2026 danifunker
+    Copyright (c)2026 starfrost
 
     dsd5217.cpp: The Qualogy (previously known as Data Systems Design) DSD 5217 Multibus Disk & Tape Controller
 

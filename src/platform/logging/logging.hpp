@@ -1,12 +1,13 @@
 // 
-// Starfrost Shared Logging System-NG (NextGen) Version 5.3.1
+// Starfrost Shared Logging System-NG (NextGen) Version 6.0!
 // Copyright © 2023-2026 starfrost
 //
 // This is a completely rewritten, C++ header only version of SSLS. 
 // It adds the capacity to have custom channels, custom prefixes, custom date formats, stderr support and uses C++ concepts. 
 // It almost eliminates fixed-sized buffers and uses streams. It's a fully self-contained header-only library.
 //
-// For C projects, use SSLS 4.x.
+// For single-threaded C projects, use SSLS 4.x (currently: 4.8).
+// For multi-threaded C projects, when I write it, SSLS-C 6 will be available
 //
 // 5.0.0            May 21, 2026        Initial release of SSLS C++ (custom channels, prefixes, channel mask, last-chance unsafe method etc)
 // 5.0.1            June 25, 2026       Message prefix take on the same colour as the channel of a message
@@ -20,7 +21,10 @@
 //                                      Fix channel masks in settings not doing anything.
 // 5.3.1            August 8, 2026      Add GetChannelMask to get the channel mask.
 // 5.4.0            August 10, 2026     Fix custom channels, add GetChannel
-
+//
+// 6.0.0            September 14, 2026  Threadsafe SSLS...Implement a simple MPSC queue for thread-safety
+//                                      Logger now runs on its own thread
+//                                      Remove "NextGen" branding, change to simply "C++"
 #pragma once
 
 // Includes
@@ -44,9 +48,10 @@
 
 // Strings, change to localise or whatever
 
-#define STRING_VERSION                  "5.4.0 (August 10, 2026)"               // Version number as a string (we don't need it in any other form)
-#define STRING_SIGN_ON                  "SSLS-NG (Starfrost Shared Logging System - Next Gen) " STRING_VERSION " initialised" 
+#define STRING_VERSION                  "6.0.0 (September 14, 2026)"            // Version number as a string (we don't need it in any other form)
+#define STRING_SIGN_ON                  "Starfrost Shared Logging System (C++) " STRING_VERSION " initialised" 
 #define STRING_ANSI_PREFIX              "\x1B["                                 // Some ANSI commands use this as a prefix
+
 
 #ifdef LOGGER_USE_NAMESPACE
 namespace LOGGER_NAMESPACE
@@ -121,6 +126,7 @@ namespace LOGGER_NAMESPACE
         File = 1 << 2,                                  // Log to a log file.
         MaxValid = (File << 1) - 1,                     // Maximum valid mask
     }; 
+
 
     /// @brief The settings that the logging system will use. SET BEFORE CALLING Logging::Init!
     class LoggerSettings
@@ -206,7 +212,7 @@ namespace LOGGER_NAMESPACE
 
     public: 
         inline static LoggerSettings settings;                // the settings
-
+        
         inline static void Init()
         {
             customChannels = std::vector<LogChannel>();
@@ -251,7 +257,24 @@ namespace LOGGER_NAMESPACE
             }
 
         skipfile:
+            // final init: queue, logthread
+            queue = LogQueue();
+            loggerThread = new std::thread(Logger::Tick);
+
             initialised = true;
+        }
+
+        /// @brief main thread loop
+        inline static void Tick()
+        {
+            while (initialised)
+            {
+                if (queue.AnythingToDo())
+                {
+                    // do something
+                }
+            }
+
         }
         
         /// @brief Adds a custom channel to the logger.
@@ -313,7 +336,7 @@ namespace LOGGER_NAMESPACE
         /// @param channelName A custom channel name if present. NULLPTR to use the channel mask.
         /// @param channelMask The channel to send it to.
         /// @param sendChannelName if the channel name should be sent or not.
-        /// @param newline Also send a newline.
+        /// @param newline Also send a newline.void
         inline static void Log(const char* prefix, const char* msg, const char* channelName, size_t channelMask = 0, bool newline = true,
             bool sendChannelName = true, bool sendDate = true)
         {
@@ -529,12 +552,81 @@ namespace LOGGER_NAMESPACE
         /// @brief Shuts down the logging system
         inline static void Shutdown()
         {
+            initialised = false;        // tell logger thread it's time to stop
+            loggerThread->join();
+            delete loggerThread; 
+
             if (settings.destinations & LogDestination::File)
                 settings.logStream.close();
-
-            initialised = false;
         }
-        private: 
+
+        // PRIVATES
+    private: 
+
+        //
+        // MPSC Queue system
+        //    
+
+        // thread wants us to actually log a message.
+        // **** INTERNAL **** 
+        class LogMessage
+        {
+            const char* prefix;
+            const char* msg;
+            const char* channelName;
+            size_t channelMask = 0;
+            bool newline = true,
+            bool sendChannelName = true;
+            bool sendDate = true;
+        };
+
+        // for now just hardcode a size. should balance memory use and perf. if 64 log messages get written at once then ???? 
+        #define LOG_QUEUE_BASE_CAPACITY     64
+    
+        /// @brief Log Queue type
+        class LogQueue
+        {
+        public:
+            LogQueue()
+            {
+                LogMessage* buf = new LogMessage[capacity];
+            }
+
+            ~LogQueue()
+            {
+                delete buf; 
+            }
+
+            bool Push(const LogMessage &msg)
+            {
+
+            }
+
+            /// @brief tells us that we have a log message to commit
+            /// @return a boolean indicating that w ehave log mesasges to commit
+            bool AnythingToDo() { }; 
+
+        private:
+            size_t capacity = LOG_QUEUE_BASE_CAPACITY; 
+
+            // pad to 64 bit for perf
+
+            /// @brief the index that we read
+            alignas(64) std::atomic<size_t> readIndex {0};
+            
+            /// @brief the commit write index
+            alignas(64) std::atomic<size_t> commitWriteIndex {0};
+
+            /// @brief the reserve write index
+            alignas(64) std::atomic<size_t> reserveWriteIndex {0};
+
+            LogMessage* buf = nullptr;
+        }; 
+        
+        /// @brief backing object for the thread that the logger runs on
+        std::thread* loggerThread; 
+
+        Logger::LogQueue queue; 
 
         /// @brief Maps console colours to ANSI escape codes for foreground colours
         inline static std::unordered_map<ConsoleColor, const char*> colorToAnsiTableFg =
@@ -584,6 +676,10 @@ namespace LOGGER_NAMESPACE
         inline static std::vector<LogChannel> customChannels;       // internal vector of custom channels 
 
         inline static bool initialised;                             // determines if we were initialised successfully
+
+        //
+        // METHODS
+        //
 
         /// @brief Internal method to send to multiple streams if we need to
         /// @param msg The message to send

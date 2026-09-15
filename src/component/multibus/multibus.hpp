@@ -6,6 +6,7 @@
 
     multibus.hpp: The Intel Multibus bus.
     This is the bus that is used for everything on the early IRISes, and most things on the later IRIS 3000.
+    We layer this on TOP of the address space implementation because multibus is not used for everyting
 
     Most likely it was inheited from the SUN design that SGI bought back in '82. PM1/PM2/IP1 boards are fully multibus, IP2 boards,
     except for the CPU, GPU and FPU (?) (thees use their own private bus.)
@@ -55,7 +56,7 @@ namespace Motion
     #define MULTIBUS_SLAVE_PAGE_MASK        0xFFF
     #define MULTIBUS_SLAVE_FRAME_MASK       0x3FFF
 
-    // The 5217 drives 24 address lines.
+    // The Multibus drives 24 address lines. e.g. the 5217 also uses it
     #define MULTIBUS_ADDRESS_MASK           0xFFFFFF
 
     #define MULTIBUS_LOG_PREFIX             "Multibus"

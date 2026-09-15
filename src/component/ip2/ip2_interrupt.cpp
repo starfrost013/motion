@@ -100,11 +100,15 @@ namespace Motion
 
     void IP2Interrupt::Update()
     {
+        // this sucks need to move it
         if (!cpu)
+        {
             cpu = Emulation::GetMachine()->FindComponentByType<ComponentCPU>();
+        
+            if (!cpu)
+                return;
 
-        if (!cpu)
-            return;
+        }
 
         // ST_ENABINT determines if interrupts are enabled
         uint8_t levels = enabled ? PendingLevels() : 0;
