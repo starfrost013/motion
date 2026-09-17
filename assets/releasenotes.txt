@@ -6,6 +6,8 @@ Release Notes
 0.3.0
     * reset process is much less invasive, it just resets components rather than shutting down and rebooting the emulator
     * Fix VRAM editor causing a memory leak on close
+    * Logger 6.0: Fix many issues with logging:
+        * Uses std:;string internally for memory safety
 
 
 0.2.0 (September 5, 2026)

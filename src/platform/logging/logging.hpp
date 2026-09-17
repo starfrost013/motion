@@ -22,9 +22,11 @@
 // 5.3.1            August 8, 2026      Add GetChannelMask to get the channel mask.
 // 5.4.0            August 10, 2026     Fix custom channels, add GetChannel
 //
-// 6.0.0            September 14, 2026  Threadsafe SSLS...Implement a simple MPSC queue for thread-safety
+// 6.0.0            September 17, 2026  Threadsafe SSLS...Implement a simple MPSC queue for thread-safety
 //                                      Logger now runs on its own thread
 //                                      Remove "NextGen" branding, change to simply "C++"
+//                                      Use std::string internally inside logger to ensure memory safety and correct copying behaviour
+
 #pragma once
 
 // Includes
@@ -48,7 +50,7 @@
 
 // Strings, change to localise or whatever
 
-#define STRING_VERSION                  "6.0.0 (September 14, 2026)"            // Version number as a string (we don't need it in any other form)
+#define STRING_VERSION                  "6.0.0 (September 17, 2026)"            // Version number as a string (we don't need it in any other form)
 #define STRING_SIGN_ON                  "Starfrost Shared Logging System (C++) " STRING_VERSION " initialised" 
 #define STRING_ANSI_PREFIX              "\x1B["                                 // Some ANSI commands use this as a prefix
 
@@ -328,7 +330,8 @@ namespace LOGGER_NAMESPACE
 
             return false; 
         }
-
+    
+        /// @brief Pops the next message out of the queue and logs it.
         inline static void LogNextMessage()
         {
             auto messageEntry = queue.Pop();
@@ -346,9 +349,9 @@ namespace LOGGER_NAMESPACE
                 return;
             }
 
-            if (message.channelName)
+            if (!message.channelName.empty())
             {
-                LogChannel* customChannel = GetChannel(message.channelName);
+                LogChannel* customChannel = GetChannel(message.channelName.c_str());
 
                 if (!customChannel)
                 {
@@ -360,7 +363,7 @@ namespace LOGGER_NAMESPACE
                     return;
             }
 
-            if (message.channelName == nullptr)
+            if (message.channelName.empty())
             {
                 if (!(settings.channelMask & message.channelMask))
                     return;
@@ -429,13 +432,13 @@ namespace LOGGER_NAMESPACE
                 if ((message.channelMask & LogChannels::UnsafeShutdown) && unsafeEnabled)
                     LogOut(unsafeNameStr);
 
-                if (message.channelName != nullptr)
+                if (!message.channelName.empty())
                 {
                     // If there are some custom channels dump their names out
                     for (LogChannel channel : customChannels)
                     {
                         if (channel.enabled
-                        && !strcmp(channel.name, message.channelName))
+                        && !strcmp(channel.name, message.channelName.c_str()))
                         {
                             LogOut(colorToAnsiTableFg[channel.colorFg]);
                             LogOut(colorToAnsiTableBg[channel.colorBg]);
@@ -452,10 +455,10 @@ namespace LOGGER_NAMESPACE
             }
 
             // send out an optional prefix to the message
-            if (message.prefix != nullptr)
+            if (!message.prefix.empty())
             {
                 LogOut("[");
-                LogOut(message.prefix);
+                LogOut(message.prefix.c_str());
                 LogOut("] ");
             }
 
@@ -488,11 +491,11 @@ namespace LOGGER_NAMESPACE
                 LogOut("]");
             }
 
-            if (message.sendDate || message.sendChannelName || message.prefix != nullptr)
+            if (message.sendDate || message.sendChannelName || !message.prefix.empty())
                 LogOut(": "); // Log out a colon if we need to
 
             // finally log the real message
-            LogOut(message.msg);
+            LogOut(message.msg.c_str());
 
             // can't hurt
             // don't need to do it if it's a message only log, it'll save a little bit of time, so may as well do it
@@ -538,10 +541,18 @@ namespace LOGGER_NAMESPACE
             LogMessage msgObject = LogMessage();
 
             msgObject.channelMask = channelMask;
-            msgObject.channelName = channelName;
-            msgObject.msg = msg;
+
+            if (channelName)
+                msgObject.channelName = channelName;
+            
+            if (msg)
+                msgObject.msg = msg;
+
             msgObject.newline = newline;
-            msgObject.prefix = prefix;
+
+            if (prefix)
+                msgObject.prefix = prefix;
+
             msgObject.sendChannelName = sendChannelName;
             msgObject.sendDate = sendDate;
 
@@ -593,9 +604,10 @@ namespace LOGGER_NAMESPACE
         // **** INTERNAL **** 
         struct LogMessage
         {
-            const char* prefix;
-            const char* msg;
-            const char* channelName;
+            // in order to ensure memory safety we just do this
+            std::string prefix;
+            std::string msg;
+            std::string channelName;
             size_t channelMask = 0;
             bool newline = true;
             bool sendChannelName = true;
@@ -616,7 +628,7 @@ namespace LOGGER_NAMESPACE
 
             ~LogQueue()
             {
-                delete buf; 
+                delete[] buf; 
             }
 
             bool Push(const LogMessage &msg)
@@ -665,7 +677,7 @@ namespace LOGGER_NAMESPACE
                 size_t reservedWrite = reserveWriteIndex.load(std::memory_order_relaxed);
                 size_t read = readIndex.load(std::memory_order_relaxed);
 
-                return ((reservedWrite - read) == 0); 
+                return ((reservedWrite - read) > 0); 
         
             }; 
 
