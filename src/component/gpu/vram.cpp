@@ -32,6 +32,11 @@ namespace Motion
         
     }
 
+    void ComponentVRAM::Reset()
+    {
+        // clear VRAM to zero
+        memset(vram, 0x00, GetCapacity()); 
+    }
 
     void ComponentVRAM::Shutdown()
     {

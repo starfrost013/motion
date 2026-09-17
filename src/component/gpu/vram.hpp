@@ -21,6 +21,7 @@ namespace Motion
     public:
         bool IsEarlyStart() override { return true; }; 
         void Start() override; 
+        void Reset() override; 
         void Shutdown() override;
 
         // returs
