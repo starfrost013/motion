@@ -11,7 +11,6 @@
 #include <Motion.hpp>
 
 // ALL UTIL INCLUDES MUST BE HERE
-#include <platform/util/mpsc.hpp>
 
 namespace Motion
 {

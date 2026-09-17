@@ -258,7 +258,6 @@ namespace LOGGER_NAMESPACE
 
         skipfile:
             // final init: queue, logthread
-            queue = LogQueue();
             loggerThread = new std::thread(Logger::Tick);
 
             initialised = true;
@@ -271,7 +270,7 @@ namespace LOGGER_NAMESPACE
             {
                 if (queue.AnythingToDo())
                 {
-                    // do something
+                    LogNextMessage();
                 }
             }
 
@@ -330,16 +329,16 @@ namespace LOGGER_NAMESPACE
             return false; 
         }
 
-        /// @brief Send a single message to the log. Also the internal log method called by all the others
-        /// @param prefix Component prefix
-        /// @param msg The message to send to the log
-        /// @param channelName A custom channel name if present. NULLPTR to use the channel mask.
-        /// @param channelMask The channel to send it to.
-        /// @param sendChannelName if the channel name should be sent or not.
-        /// @param newline Also send a newline.void
-        inline static void Log(const char* prefix, const char* msg, const char* channelName, size_t channelMask = 0, bool newline = true,
-            bool sendChannelName = true, bool sendDate = true)
+        inline static void LogNextMessage()
         {
+            auto messageEntry = queue.Pop();
+
+            // nothing to do
+            if (messageEntry == std::nullopt)
+                return;
+
+            LogMessage message = messageEntry.value();
+            
             // check if the logging was actually initialised properly
             if (!initialised)
             {
@@ -347,13 +346,13 @@ namespace LOGGER_NAMESPACE
                 return;
             }
 
-            if (channelName)
+            if (message.channelName)
             {
-                LogChannel* customChannel = GetChannel(channelName);
+                LogChannel* customChannel = GetChannel(message.channelName);
 
                 if (!customChannel)
                 {
-                    std::cout << "SSLS Error 4: Invalid channel name " << channelName << "supplied!" << std::endl;
+                    std::cout << "SSLS Error 4: Invalid channel name " << message.channelName << "supplied!" << std::endl;
                     return;
                 }
 
@@ -361,9 +360,9 @@ namespace LOGGER_NAMESPACE
                     return;
             }
 
-            if (channelName == nullptr)
+            if (message.channelName == nullptr)
             {
-                if (!(settings.channelMask & channelMask))
+                if (!(settings.channelMask & message.channelMask))
                     return;
             }
             // for easier checking
@@ -385,18 +384,18 @@ namespace LOGGER_NAMESPACE
             #endif
 
             // send our new channel name
-            if (sendChannelName)
+            if (message.sendChannelName)
             {
                 // check above only accounts for the case where custom channels are disabled:
                 // so we repeat the check here in case we want to log to only a custom chnanel, and those channels are enabled
 
-                if (channelMask & LogChannels::Message
+                if (message.channelMask & LogChannels::Message
                 && settings.channelMask & LogChannels::Message)
                     LogOut(messageNameStr);
 
                 // this code could be simplified but we want to allow multiple channels to be logged to at once. so we do this
             #ifdef DEBUG
-                if (channelMask & LogChannels::Debug
+                if (message.channelMask & LogChannels::Debug
                 && settings.channelMask & LogChannels::Debug)
                 {
                     LogOut(colorToAnsiTableFg[ConsoleColor::BrightBlue]);
@@ -404,7 +403,7 @@ namespace LOGGER_NAMESPACE
                 }
             #endif
 
-                if (channelMask & LogChannels::Warning
+                if (message.channelMask & LogChannels::Warning
                 && settings.channelMask & LogChannels::Warning)
                 {
                     LogOut(colorToAnsiTableFg[ConsoleColor::BrightYellow]);
@@ -416,27 +415,27 @@ namespace LOGGER_NAMESPACE
                 bool unsafeEnabled  = (settings.channelMask & LogChannels::UnsafeShutdown);
 
                 // these will all use the same colour
-                if (((channelMask & LogChannels::Error) && errorEnabled)
-                || ((channelMask & LogChannels::FatalError) && fatalEnabled)
-                || ((channelMask & LogChannels::UnsafeShutdown) && unsafeEnabled))
+                if (((message.channelMask & LogChannels::Error) && errorEnabled)
+                || ((message.channelMask & LogChannels::FatalError) && fatalEnabled)
+                || ((message.channelMask & LogChannels::UnsafeShutdown) && unsafeEnabled))
                 {
                     LogOut(colorToAnsiTableFg[ConsoleColor::BrightRed]);
                 }
 
-                if ((channelMask & LogChannels::Error) && errorEnabled)
+                if ((message.channelMask & LogChannels::Error) && errorEnabled)
                     LogOut(errorNameStr);
-                if ((channelMask & LogChannels::FatalError) && fatalEnabled)
+                if ((message.channelMask & LogChannels::FatalError) && fatalEnabled)
                     LogOut(fatalNameStr);
-                if ((channelMask & LogChannels::UnsafeShutdown) && unsafeEnabled)
+                if ((message.channelMask & LogChannels::UnsafeShutdown) && unsafeEnabled)
                     LogOut(unsafeNameStr);
 
-                if (channelName != nullptr)
+                if (message.channelName != nullptr)
                 {
                     // If there are some custom channels dump their names out
                     for (LogChannel channel : customChannels)
                     {
                         if (channel.enabled
-                        && !strcmp(channel.name, channelName))
+                        && !strcmp(channel.name, message.channelName))
                         {
                             LogOut(colorToAnsiTableFg[channel.colorFg]);
                             LogOut(colorToAnsiTableBg[channel.colorBg]);
@@ -447,16 +446,16 @@ namespace LOGGER_NAMESPACE
             }
 
             // special handling so the prefix does not look fucked
-            if (channelMask != LogChannels::Message)
+            if (message.channelMask != LogChannels::Message)
             {
                 LogOut("] ");
             }
 
             // send out an optional prefix to the message
-            if (prefix != nullptr)
+            if (message.prefix != nullptr)
             {
                 LogOut("[");
-                LogOut(prefix);
+                LogOut(message.prefix);
                 LogOut("] ");
             }
 
@@ -465,7 +464,7 @@ namespace LOGGER_NAMESPACE
             bool hideDates = settings.hideDates;
 
             // local override in case we want to use multiple log calls for one message
-            if (!sendDate)
+            if (!message.sendDate)
                 hideDates = true;
 
             if (!settings.hideDates) // also the date
@@ -489,34 +488,34 @@ namespace LOGGER_NAMESPACE
                 LogOut("]");
             }
 
-            if (sendDate || sendChannelName || prefix != nullptr)
+            if (message.sendDate || message.sendChannelName || message.prefix != nullptr)
                 LogOut(": "); // Log out a colon if we need to
 
             // finally log the real message
-            LogOut(msg);
+            LogOut(message.msg);
 
             // can't hurt
             // don't need to do it if it's a message only log, it'll save a little bit of time, so may as well do it
 
-            if (channelMask != LogChannels::Message)
+            if (message.channelMask != LogChannels::Message)
             {
                 LogOut(colorResetFgStr);
                 LogOut(colorResetBgStr);
             }
 
             // done, dump newline
-            if (newline)
+            if (message.newline)
                 LogOut("", true);
 
             // It's a fatal so run the fatal function
-            if (channelMask & LogChannels::FatalError)
+            if (message.channelMask & LogChannels::FatalError)
             {
                 // Striclty optional
                 if (settings.fatalFunc)
                     settings.fatalFunc();
             }
 
-            if (channelMask & LogChannels::UnsafeShutdown)
+            if (message.channelMask & LogChannels::UnsafeShutdown)
             {
                 if (settings.lastChanceUnsafeFunc)
                     settings.lastChanceUnsafeFunc();
@@ -524,6 +523,29 @@ namespace LOGGER_NAMESPACE
                 // it's going down, it's going down!
                 std::abort();
             }
+        }
+
+        /// @brief Send a single message to the log. Also the internal log method called by all the others
+        /// @param prefix Component prefix
+        /// @param msg The message to send to the log
+        /// @param channelName A custom channel name if present. NULLPTR to use the channel mask.
+        /// @param channelMask The channel to send it to.
+        /// @param sendChannelName if the channel name should be sent or not.
+        /// @param newline Also send a newline.void
+        inline static void Log(const char* prefix, const char* msg, const char* channelName, size_t channelMask = 0, bool newline = true,
+            bool sendChannelName = true, bool sendDate = true)
+        {
+            LogMessage msgObject = LogMessage();
+
+            msgObject.channelMask = channelMask;
+            msgObject.channelName = channelName;
+            msgObject.msg = msg;
+            msgObject.newline = newline;
+            msgObject.prefix = prefix;
+            msgObject.sendChannelName = sendChannelName;
+            msgObject.sendDate = sendDate;
+
+            queue.Push(msgObject);
         }
         
         /// @brief Send a single message to the log. 
@@ -569,13 +591,13 @@ namespace LOGGER_NAMESPACE
 
         // thread wants us to actually log a message.
         // **** INTERNAL **** 
-        class LogMessage
+        struct LogMessage
         {
             const char* prefix;
             const char* msg;
             const char* channelName;
             size_t channelMask = 0;
-            bool newline = true,
+            bool newline = true;
             bool sendChannelName = true;
             bool sendDate = true;
         };
@@ -599,12 +621,53 @@ namespace LOGGER_NAMESPACE
 
             bool Push(const LogMessage &msg)
             {
+                size_t reservedWrite = reserveWriteIndex.load(std::memory_order_relaxed);
+                size_t read = readIndex.load(std::memory_order_relaxed);
 
+                /* its full */
+                if (reservedWrite - read >= capacity)
+                    return false; 
+
+                if (reserveWriteIndex.compare_exchange_weak(reservedWrite, reservedWrite + 1, std::memory_order_relaxed))
+                {
+                    buf[reservedWrite & (capacity - 1)] = msg;
+
+                    // yield so that we can perform activities while the logger is getting rid of stuff
+                    while (!(commitWriteIndex.compare_exchange_weak(reservedWrite, reservedWrite + 1, std::memory_order_release, std::memory_order_relaxed)))
+                        std::this_thread::yield();
+
+                    return true; 
+                }
+
+                return false; 
+            }
+
+            // ig uess std::optional gets around the whole making everything a pointer issue
+            std::optional<LogMessage> Pop()
+            {
+                size_t read = readIndex.load(std::memory_order_relaxed);
+                size_t commitWrite = commitWriteIndex.load(std::memory_order_acquire); 
+
+                // there is nothing to pop
+                if (commitWrite == read)
+                    return std::nullopt;
+                    
+                auto msg = buf[read & (capacity - 1)];
+
+                readIndex.store(read + 1, std::memory_order_relaxed);
+                return std::make_optional(msg); // ok
             }
 
             /// @brief tells us that we have a log message to commit
             /// @return a boolean indicating that w ehave log mesasges to commit
-            bool AnythingToDo() { }; 
+            bool AnythingToDo() 
+            { 
+                size_t reservedWrite = reserveWriteIndex.load(std::memory_order_relaxed);
+                size_t read = readIndex.load(std::memory_order_relaxed);
+
+                return ((reservedWrite - read) == 0); 
+        
+            }; 
 
         private:
             size_t capacity = LOG_QUEUE_BASE_CAPACITY; 
@@ -624,9 +687,9 @@ namespace LOGGER_NAMESPACE
         }; 
         
         /// @brief backing object for the thread that the logger runs on
-        std::thread* loggerThread; 
+        inline static std::thread* loggerThread; 
 
-        Logger::LogQueue queue; 
+        inline static Logger::LogQueue queue; 
 
         /// @brief Maps console colours to ANSI escape codes for foreground colours
         inline static std::unordered_map<ConsoleColor, const char*> colorToAnsiTableFg =
