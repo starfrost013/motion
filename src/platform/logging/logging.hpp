@@ -611,7 +611,7 @@ namespace LOGGER_NAMESPACE
         public:
             LogQueue()
             {
-                LogMessage* buf = new LogMessage[capacity];
+                buf = new LogMessage[capacity];
             }
 
             ~LogQueue()
