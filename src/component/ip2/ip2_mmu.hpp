@@ -101,42 +101,14 @@ namespace Motion
     {
         friend class CoherentExtensionIP2MMU;
     public: 
-        void Start() override
-        {
-            ComponentMMU::Start();
 
-            interrupts = Emulation::GetMachine()->FindComponentByType<IP2Interrupt>();
-
-            // map the private ram
-            AddrSpaceMapping mapping = AddrSpaceMapping();
-
-            logIP2MMU = Cvar::Get("logIP2MMU", "0");
-
-            mapping.startAddr = MMU_START;
-            mapping.endAddr = MMU_END;
-            mapping.component = this;
-            AddrSpace::AddMapping(mapping);
-
-            mmuExtension = new CoherentExtensionIP2MMU(this);
-            Coherent::RegisterExtension(mmuExtension);
-
-            mmuChannel = LogChannel(MMU_LOG_CHANNEL_NAME, ConsoleColor::BrightCyan, ConsoleColor::White);
-            Logger::AddChannel(mmuChannel);
-            logEnabled = logIP2MMU->GetValue();
-
-            if (logEnabled)
-                Logger::SetChannelEnabled(MMU_LOG_CHANNEL_NAME);
-        }
-
-        void Shutdown() override
-        {
-            delete mmuExtension;
-            ComponentMMU::Shutdown();
-        }
+        void Start() override; 
+        void Reset() override;
+        void Shutdown() override;
 
         const char* GetName() override { return "IRIS 3130 TTL MMU"; };
 
-        // Register I/O
+        // I/O
         uint8_t Read8(size_t addr) override;
         uint16_t Read16(size_t addr) override;
         uint32_t Read32(size_t addr) override;

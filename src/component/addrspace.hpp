@@ -46,25 +46,16 @@ namespace Motion
             static uint8_t ReadU8(size_t addr);
             static uint16_t ReadU16(size_t addr);
             static uint32_t ReadU32(size_t addr);
-            static int8_t ReadS8(size_t addr);
-            static int16_t ReadS16(size_t addr);
-            static int32_t ReadS32(size_t addr);
 
             /* Peeks have no side effects and are used by the debugger */
             static uint8_t PeekU8(size_t addr);
             static uint16_t PeekU16(size_t addr);
             static uint32_t PeekU32(size_t addr);
-            static int8_t PeekS8(size_t addr);
-            static int16_t PeekS16(size_t addr);
-            static int32_t PeekS32(size_t addr);
  
             static void WriteU8(size_t addr, uint8_t value);
             static void WriteU16(size_t addr, uint16_t value);
             static void WriteU32(size_t addr, uint32_t value);
-            static void WriteS8(size_t addr, int8_t value);
-            static void WriteS16(size_t addr, int16_t value);
-            static void WriteS32(size_t addr, int32_t value);
- 
+
             static void AddMapping(AddrSpaceMapping mapping);
             static AddrSpaceMapping* GetMapping(size_t addr);
             static AddrSpaceMapping* PeekMapping(size_t addr);

@@ -29,7 +29,7 @@ namespace Motion
     }
 
     // non-cached path which doesn't break everything
-    AddrSpaceMapping *AddrSpace::PeekMapping(size_t addr)
+    AddrSpaceMapping* AddrSpace::PeekMapping(size_t addr)
     {
         // we are oging to have to optimise this    ``
         for (auto it : mappings)
@@ -136,10 +136,6 @@ namespace Motion
         }
     }
 
-    int8_t AddrSpace::ReadS8(size_t addr) { return (int8_t)ReadU8(addr); };
-    int16_t AddrSpace::ReadS16(size_t addr) { return (int16_t)ReadU16(addr); };
-    int32_t AddrSpace::ReadS32(size_t addr) { return (int32_t)ReadU32(addr); };
-
     // todo: make readxx call this peakxx function
 
     uint8_t AddrSpace::PeekU8(size_t addr)
@@ -174,10 +170,6 @@ namespace Motion
 
         return 0x00;
     }
-
-    int8_t AddrSpace::PeekS8(size_t addr) { return (int8_t)PeekU8(addr); };
-    int16_t AddrSpace::PeekS16(size_t addr) { return (int16_t)PeekU16(addr); };
-    int32_t AddrSpace::PeekS32(size_t addr) { return (int32_t)PeekU32(addr); };
 
     void AddrSpace::AddMapping(AddrSpaceMapping mapping)
     {
@@ -250,21 +242,6 @@ namespace Motion
             BusError(physAddr, true, 32);
             LogUnmapped("WriteU32", physAddr, true, value);
         }
-    }
-
-    void AddrSpace::WriteS8(size_t addr, int8_t value)
-    {
-        WriteU8(addr, (uint8_t)value);
-    }
-
-    void AddrSpace::WriteS16(size_t addr, int16_t value)
-    {
-        WriteU16(addr, (uint16_t)value);
-    }
-
-    void AddrSpace::WriteS32(size_t addr, int32_t value)
-    {
-        WriteU32(addr, (uint32_t)value);
     }
 
     // bus error stuff

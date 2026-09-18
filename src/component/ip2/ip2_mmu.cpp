@@ -14,7 +14,33 @@ namespace Motion
     Cvar* logIP2MMU; 
 
     // all of this code should be macroised or turned into  utility functions in /platform/util
+    void IP2MMU::Start()
+    {
+        ComponentMMU::Start();
 
+        interrupts = Emulation::GetMachine()->FindComponentByType<IP2Interrupt>();
+
+        // map the private ram
+        AddrSpaceMapping mapping = AddrSpaceMapping();
+
+        logIP2MMU = Cvar::Get("logIP2MMU", "0");
+
+        mapping.startAddr = MMU_START;
+        mapping.endAddr = MMU_END;
+        mapping.component = this;
+        AddrSpace::AddMapping(mapping);
+
+        mmuExtension = new CoherentExtensionIP2MMU(this);
+        Coherent::RegisterExtension(mmuExtension);
+
+        mmuChannel = LogChannel(MMU_LOG_CHANNEL_NAME, ConsoleColor::BrightCyan, ConsoleColor::White);
+        Logger::AddChannel(mmuChannel);
+        logEnabled = logIP2MMU->GetValue();
+
+        if (logEnabled)
+            Logger::SetChannelEnabled(MMU_LOG_CHANNEL_NAME);
+    }
+    
     uint8_t IP2MMU::Read8(size_t addr)
     {
         if (addr & 1)
@@ -147,6 +173,19 @@ namespace Motion
         Write16(addr + 2, value);
     }
 
+    /// @brief run on reset
+    void IP2MMU::Reset()
+    {
+        // erset everything to zero
+        osBase = status = parity = multibusProtect = textdataBase = textdataLimit = stackBase = stackLimit = 0;
+        memset(pagetable, 0x00, sizeof(pagetable));
+    }
+
+    void IP2MMU::Shutdown()
+    {
+        delete mmuExtension;
+        ComponentMMU::Shutdown();
+    }
     //
     // The actual MMU parts
     //

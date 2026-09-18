@@ -17,6 +17,56 @@ namespace Motion
 {
     Cvar* logIP2DUART;
 
+    void DUART68681::Start()
+    {
+        ComponentSerial::Start();
+        
+        // map the DUARTs
+        AddrSpaceMapping mapping0 = AddrSpaceMapping();
+
+        mapping0.startAddr = DUART0_START;
+        mapping0.endAddr = DUART0_START + DUART_NUM_REGS - 1;   // GetMapping's end is inclusive
+        mapping0.component = this;
+
+        AddrSpaceMapping mapping1 = AddrSpaceMapping();
+
+        mapping1.startAddr = DUART1_START;
+        mapping1.endAddr = DUART1_START + DUART_NUM_REGS - 1;
+        mapping1.component = this;
+
+        AddrSpace::AddMapping(mapping0);
+        AddrSpace::AddMapping(mapping1);
+
+        // RESETN initialises the IVR to 0x0F and establishes sane default framing for each channel so that
+        // GetFrameBits() doesn't return garbage before the PROM has had a chance to program MR1/MR2.
+        for (int32_t d = 0; d < 2; d++)
+        {
+            duarts[d].ivr = 0x0F;
+
+            for (int32_t c = 0; c < DUART_NUM_CHANNELS; c++)
+                UpdateDataFrameState(d, c);
+        }
+
+        duartExtension = new CoherentExtensionDUART68681(this);
+        Coherent::RegisterExtension(duartExtension);
+
+        // init misc stuff
+        logIP2DUART = Cvar::Get("logIP2DUART", "0");
+        duartChannel = LogChannel(DUART_LOG_CHANNEL_NAME, ConsoleColor::BrightGreen, ConsoleColor::White);
+        Logger::AddChannel(duartChannel);
+        logEnabled = logIP2DUART->GetValue();
+
+        if (logEnabled)
+            Logger::SetChannelEnabled(DUART_LOG_CHANNEL_NAME);
+
+        interrupts = Emulation::GetMachine()->FindComponentByType<IP2Interrupt>();
+    }
+    
+    void DUART68681::Shutdown()
+    {
+        delete duartExtension;
+    }
+
     uint8_t DUART68681::Read8(size_t addr)
     {
         // must be computed BEFORE addr is masked down to a register index - GetDuartIONum looks at a bit far
