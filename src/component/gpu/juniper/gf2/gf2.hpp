@@ -156,13 +156,15 @@ namespace Motion
     private: 
         Multibus* multibus;
 
-        bool geBusy;  // token is passing through
-
+        bool geBusy = false;  // token is passing through
         bool geReset = true; 
 
         uint16_t geFlagsRead;
         uint16_t geFlagsWritten;
-        uint16_t fbcFlags; 
+        uint16_t fbcFlagsRead;
+        uint16_t fbcFlagsWritten; 
+
+        bool geX = false;
 
         // FBC SHIT
         AM2903 am2903; 

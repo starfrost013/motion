@@ -24,8 +24,31 @@ namespace Motion
 
     uint16_t GF2::FBCRead16(size_t addr)
     {
+        uint16_t value = 0x00;
+        
+        if (addr >= GF2_FBC_DATA_START && addr <= GF2_FBC_DATA_END)
+        {
+            uint16_t ucodeValue = ucode[GetCurrentUcodeState(addr)][GetCurrentUcodeSlice()];
+        
+            // the top slice of each state is 8b its wide
+            return (GetCurrentUcodeSlice() == 3) ? (ucodeValue & 0xFF) : ucodeValue;
+        }    
+        else
+        {
+            switch (addr)
+            {
+                case GF2_FBC_FLAGS:
+                    // ensure that GL2 init knows we are alive
+                    fbcFlagsRead |= GF2_FBC_FLAGS_READ_FBC_ACK;
+                    fbcFlagsRead |= GF2_FBC_FLAGS_READ_BPC_ACK;
+                    
+                    value = fbcFlagsRead;
+                    break;
+            }
 
-        return 0xFF; 
+        }
+        
+        return value; 
     }
 
     void GF2::FBCWrite16(size_t addr, uint16_t value)
@@ -33,6 +56,19 @@ namespace Motion
         // write to ucode
         if (addr >= GF2_FBC_DATA_START && addr <= GF2_FBC_DATA_END)
             ucode[GetCurrentUcodeState(addr)][GetCurrentUcodeSlice()] = value;
+        else
+        {
+            switch (addr)
+            {
+                case GF2_FBC_FLAGS:
+                    fbcFlagsWritten = value;
+                    break;
+                // ON WRITE TO FBCDATA, INITIATE UCODE OPERATIONS!
+                // THE UCODE MUST BE RUN ACCORDING TO THE COMMAND, WHICH WAS WRITTEN TO FBCDATA!
+
+            }
+        }
+        
 
         Logger::Log(std::format("FBC Write16 0x{:x} to 0x{:x}", value, addr).c_str(), LogChannels::Debug);
 

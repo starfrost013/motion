@@ -25,6 +25,7 @@ namespace Motion
 
         void Start();
         void RunFunction();
+        void Tick(); 
 
     private: 
         uint16_t q;
@@ -34,6 +35,8 @@ namespace Motion
 
         uint16_t ramAddrA, ramAddrB;
         uint16_t io;
+
+        bool running = false; 
 
     }; 
 }; 
