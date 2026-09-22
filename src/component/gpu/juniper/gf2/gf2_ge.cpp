@@ -49,7 +49,7 @@ namespace Motion
                 break;
         }
         
-        Logger::Log(std::format("GE Read16 0x{:x} from 0x{:x}", value, addr).c_str(), LogChannels::Debug);
+        Logger::Log(GF2_GE_LOG_PREFIX, std::format("GE Read16 0x{:x} from 0x{:x}", value, addr).c_str(), LogChannels::Debug);
 
         return value; 
 
@@ -65,7 +65,7 @@ namespace Motion
         }
 
         
-        Logger::Log(std::format("GE Write16 0x{:x} to 0x{:x}", value, addr).c_str(), LogChannels::Debug);
+        Logger::Log(GF2_GE_LOG_PREFIX, std::format("GE Write16 0x{:x} to 0x{:x}", value, addr).c_str(), LogChannels::Debug);
     }
 
     void GF2::GEExecuteCommand()

@@ -65,7 +65,7 @@ namespace Motion
     #define GF2_GE_FLAG_WRITE_ENABLE_AUTOCLEAR      (1 << 11)   // AUTO CLEAR fbc interrupts after writing
     #define GF2_GE_FLAG_FBC_CURRENT_STATE           ((1 << 12) | (1 << 11) | (1 << 10)) // god damn macros bruh
     #define GF2_GE_FLAG_FBC_SLICE_SHIFT             13          // FBC slice sift
-    #define GF2_GE_FLAG_WRITE_ENABLE_UCODE_ACCESS   (1 << 15)   // Microcode access enabled
+    #define GF2_GE_FLAG_WRITE_DISABLE_UCODE_ACCESS   (1 << 15)   // Microcode access enabled
 
     #define GF2_MULTIBUS_END                        0x50002FFF
 
@@ -77,9 +77,11 @@ namespace Motion
     #define GF2_MULTIBUS_SLOT                       18
 
     #define GF2_GE_LOG_PREFIX                       "GF2 - Geometry Engine"
+    #define GF2_FBC_LOG_PREFIX                      "GF2 - Frame Buffer Controller"
+    #define GF2_BPC_LOG_PREFIX                      "GF2 - Bit Plane Controller"
 
     // commands
-    // GE commands onyl: we don't care about the FBC commands,
+    // GE commands onyl: we don't care about the FBC commands, except the "alternative" ones
     // because we LLE the AM2903
 
     #define GE_CMD_WAITING		                    -1 
@@ -134,6 +136,13 @@ namespace Motion
     // 16 bit (4096 states * 4 am2903s * 4 bits per am2903) bits = 0x400, mst be 16 bit aligned = 0x3fe
     #define GF2_FBC_UCODE_ADDR_MASK                 0x3FE
 
+    // the "alternative" fbc commands. These commands are (apparently) different to actual GL2 FBC commands,
+    // but are required to boot FBC...
+    #define GF2_FBC_ALTCMD_GET_MICRO_VERSION        0x07 // must be 0x7ff / 0xfff (we use FFF)
+    #define GF2_FBC_ALTCMD_GET_SCRATCH_SIZE         0x08 // Must be 0x0200 (Microcode Version 2.0)
+
+    #define GF2_FBC_SCRATCH_SIZE                    0xFFF // scratch ram size (assume larger ofr more funcitons?)
+    #define GF2_FBC_MICRO_VERSION                   0x200 // ucode VERSION
 
     class GF2 : public Component
     {
@@ -168,6 +177,10 @@ namespace Motion
         AM2903 am2903; 
         uint16_t ucode[GF2_FBC_UCODE_STATES][GF2_FBC_UCODE_SLICES]; // 16kb 
 
+        uint16_t lastFbcAltCommand;
+
+        CoherentEditor* fbcUcodeEditor; 
+
         void GEStart();
         void FBCStart();
         uint16_t GERead16(size_t addr);
@@ -180,22 +193,23 @@ namespace Motion
 
         __attribute__((always_inline)) uint16_t GetCurrentUcodeState(size_t addr)
         { 
-            // Bits 10-12 select the upper three state bits.
+            // Bits 10-12 select the upper three state bits, which indicate which 1024 window of the 4096 states that 50002800-2bff write to
             return (((geFlagsWritten & GF2_GE_FLAG_FBC_CURRENT_STATE) >> 1) 
             | (((addr - GF2_FBC_DATA_START) & GF2_FBC_UCODE_ADDR_MASK) >> 1));
         }
 
+        __attribute__((always_inline)) bool UcodeAccessIsEnabled() { return !(geFlagsWritten & GF2_GE_FLAG_WRITE_DISABLE_UCODE_ACCESS); };
+
         /// @brief get requested microcode slice for addr addr
         uint16_t GetRequestedFBCUcodeData(uint16_t addr) { return ucode[GetCurrentUcodeState(addr)][GetCurrentUcodeSlice()]; };
-
         ///
         /// COMMANDS
         ///
 
         void GEExecuteCommand();
         void FBCExecuteCommand();
+        uint16_t FBCExecuteAlternativeCommand(uint16_t id);
         void BPCExecuteCommand();
 
-        CoherentEditor* fbcUcodeEditor; 
     }; 
 }; 

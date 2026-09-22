@@ -16,7 +16,7 @@
 namespace Motion
 {
     #define COHERENT_LOG_PREFIX     "Debugger"
-    #define COHERENT_VERSION        "Coherent v0.9 (September 1, 2026)"
+    #define COHERENT_VERSION        "Coherent v0.9"
 
     extern Cvar* startPaused;
 
