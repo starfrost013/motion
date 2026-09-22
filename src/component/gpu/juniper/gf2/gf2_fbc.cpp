@@ -26,12 +26,13 @@ namespace Motion
     {
         uint16_t value = 0x00;
         
-        if (addr >= GF2_FBC_DATA_START && addr <= GF2_FBC_DATA_END)
+        // TODO:
+        if (addr >= GF2_FBC_DATA_START && addr <= GF2_FBC_DATA_END
+        && fbcFlagsWritten == 0xFF)
         {
             uint16_t ucodeValue = ucode[GetCurrentUcodeState(addr)][GetCurrentUcodeSlice()];
-        
             // the top slice of each state is 8b its wide
-            return (GetCurrentUcodeSlice() == 3) ? (ucodeValue & 0xFF) : ucodeValue;
+            value = (GetCurrentUcodeSlice() == 3) ? (ucodeValue & 0xFF) : ucodeValue;
         }    
         else
         {
@@ -45,17 +46,22 @@ namespace Motion
                     value = fbcFlagsRead;
                     break;
             }
-
         }
-        
+
+        Logger::Log(std::format("FBC Read16 0x{:x} from 0x{:x}", value, addr).c_str(), LogChannels::Debug);
         return value; 
     }
 
     void GF2::FBCWrite16(size_t addr, uint16_t value)
     {
         // write to ucode
-        if (addr >= GF2_FBC_DATA_START && addr <= GF2_FBC_DATA_END)
-            ucode[GetCurrentUcodeState(addr)][GetCurrentUcodeSlice()] = value;
+        if (addr >= GF2_FBC_DATA_START && addr <= GF2_FBC_DATA_END
+        && fbcFlagsWritten == 0xFE)
+        {
+            uint16_t state = GetCurrentUcodeState(addr);
+            uint16_t slice = GetCurrentUcodeSlice();
+            ucode[state][slice] = value;
+        }
         else
         {
             switch (addr)
@@ -69,8 +75,16 @@ namespace Motion
             }
         }
         
-
         Logger::Log(std::format("FBC Write16 0x{:x} to 0x{:x}", value, addr).c_str(), LogChannels::Debug);
+    }
+
+    void GF2::FBCExecuteCommand()
+    {
+        
+    }
+    
+    void GF2::BPCExecuteCommand()
+    {
 
     }
 

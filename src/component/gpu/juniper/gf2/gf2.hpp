@@ -63,7 +63,7 @@ namespace Motion
     #define GF2_GE_FLAG_WRITE_ENABLE_VERT_INT       (1 << 3)    // enable vert int
     #define GF2_GE_FLAG_WRITE_ENABLE_FBC_INT        (1 << 10)   // enable fbc program (microcode) int
     #define GF2_GE_FLAG_WRITE_ENABLE_AUTOCLEAR      (1 << 11)   // AUTO CLEAR fbc interrupts after writing
-    #define GF2_GE_FLAG_FBC_CURRENT_STATE           (1 << 11) | (1 << 10) | (1 << 9)
+    #define GF2_GE_FLAG_FBC_CURRENT_STATE           ((1 << 12) | (1 << 11) | (1 << 10)) // god damn macros bruh
     #define GF2_GE_FLAG_FBC_SLICE_SHIFT             13          // FBC slice sift
     #define GF2_GE_FLAG_WRITE_ENABLE_UCODE_ACCESS   (1 << 15)   // Microcode access enabled
 
@@ -149,8 +149,6 @@ namespace Motion
         void Write32(size_t addr, uint32_t value) override; 
 
         void Tick() override;
-    
-        void GEExecuteCommand();
 
         const char* GetName() { return "GF2 Board Coordinator (GE+FBC)"; }; 
     private: 
@@ -180,14 +178,23 @@ namespace Motion
         // should be good for gcc and clang 
         __attribute__((always_inline)) uint16_t GetCurrentUcodeSlice() { return (geFlagsWritten >> GF2_GE_FLAG_FBC_SLICE_SHIFT) & 0x03; }; // calculate slice
 
-        __attribute__((always_inline)) uint16_t GetCurrentUcodeState(uint16_t addr)
+        __attribute__((always_inline)) uint16_t GetCurrentUcodeState(size_t addr)
         { 
+            // Bits 10-12 select the upper three state bits.
             return (((geFlagsWritten & GF2_GE_FLAG_FBC_CURRENT_STATE) >> 1) 
             | (((addr - GF2_FBC_DATA_START) & GF2_FBC_UCODE_ADDR_MASK) >> 1));
         }
 
         /// @brief get requested microcode slice for addr addr
         uint16_t GetRequestedFBCUcodeData(uint16_t addr) { return ucode[GetCurrentUcodeState(addr)][GetCurrentUcodeSlice()]; };
+
+        ///
+        /// COMMANDS
+        ///
+
+        void GEExecuteCommand();
+        void FBCExecuteCommand();
+        void BPCExecuteCommand();
 
         CoherentEditor* fbcUcodeEditor; 
     }; 

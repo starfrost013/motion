@@ -35,21 +35,23 @@ namespace Motion
 
     uint16_t GF2::GERead16(size_t addr)
     {
-        uint16_t val = 0x00; 
+        uint16_t value = 0x00; 
 
         switch (addr)
         {
             case GF2_GE_FLAGS:
-                val = geFlagsRead;
+                value = geFlagsRead;
 
                 if (geReset)
-                    val |= GF2_GE_FLAG_WRITE_RESET;
+                    value |= GF2_GE_FLAG_WRITE_RESET;
                 else    
-                    val &= ~(GF2_GE_FLAG_WRITE_RESET);
+                    value &= ~(GF2_GE_FLAG_WRITE_RESET);
                 break;
         }
+        
+        Logger::Log(std::format("GE Read16 0x{:x} from 0x{:x}", value, addr).c_str(), LogChannels::Debug);
 
-        return val; 
+        return value; 
 
     }
 
@@ -61,6 +63,9 @@ namespace Motion
                 geFlagsWritten = value; 
                 break; 
         }
+
+        
+        Logger::Log(std::format("GE Write16 0x{:x} to 0x{:x}", value, addr).c_str(), LogChannels::Debug);
     }
 
     void GF2::GEExecuteCommand()
