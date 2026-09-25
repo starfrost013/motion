@@ -14,6 +14,7 @@
 #include <component/multibus/multibus.hpp>
 #include <component/gpu/vram.hpp>
 #include <component/gpu/juniper/gf2/am2903/am2903.hpp>
+#include <component/gpu/juniper/gf2/am2910/am2910.hpp>
 
 namespace Motion
 {    
@@ -161,6 +162,41 @@ namespace Motion
 
         const char* GetName() { return "GF2 Board Coordinator (GE+FBC)"; }; 
     private: 
+
+        ///
+        /// PRIVATE STRUCTS
+        ///
+        enum GEType
+        {
+            GAIn,
+            Mat0, Mat1, Mat2, Mat3,
+            Clip0, Clip1, Clip2, Clip3, Clip4, Clip5,
+            Scale0, Scale1,
+            GAOut,
+        }; 
+
+        // The GE Unit
+        // We model all GEs as one...
+        class GEUnit
+        {
+            public:
+                
+            private:
+        };
+
+        /* COMMANDS ARE PASSED OT UNIT*/
+        class GECommand
+        {
+            uint16_t type;
+
+            uint8_t* data; 
+        };
+
+
+        ///
+        /// FIELDS
+        /// 
+
         Multibus* multibus;
 
         bool geBusy = false;  // token is passing through
@@ -172,6 +208,9 @@ namespace Motion
         uint16_t fbcFlagsWritten; 
 
         bool geX = false;
+
+        // geometry engine
+        GEUnit theGe;
 
         // FBC SHIT
         AM2903 am2903; 
