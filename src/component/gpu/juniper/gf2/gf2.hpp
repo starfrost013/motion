@@ -148,6 +148,8 @@ namespace Motion
     class GF2 : public Component
     {
     public: 
+        GF2() : am2910(&am2903) { };
+
         void Start() override; 
         void Shutdown() override; 
             
@@ -160,21 +162,8 @@ namespace Motion
 
         void Tick() override;
 
-        const char* GetName() { return "GF2 Board Coordinator (GE+FBC)"; }; 
+        const char* GetName() { return "GF2 (3D Graphics Board)"; }; 
     private: 
-
-        ///
-        /// PRIVATE STRUCTS
-        ///
-        enum GEType
-        {
-            GAIn,
-            Mat0, Mat1, Mat2, Mat3,
-            Clip0, Clip1, Clip2, Clip3, Clip4, Clip5,
-            Scale0, Scale1,
-            GAOut,
-        }; 
-
         // The GE Unit
         // We model all GEs as one...
         class GEUnit
@@ -182,13 +171,13 @@ namespace Motion
             public:
                 
             private:
+                uint16_t matTop;
         };
 
         /* COMMANDS ARE PASSED OT UNIT*/
         class GECommand
         {
             uint16_t type;
-
             uint8_t* data; 
         };
 
@@ -214,6 +203,7 @@ namespace Motion
 
         // FBC SHIT
         AM2903 am2903; 
+        AM2910 am2910; 
         uint16_t ucode[GF2_FBC_UCODE_STATES][GF2_FBC_UCODE_SLICES]; // 16kb 
 
         uint16_t lastFbcAltCommand;

@@ -11,20 +11,20 @@
     This is technically a problem but I don't think any other SGI systems use the AM2903.    
     Source: https://www.datasheets360.com/pdf/-6069213202016663880
 */
-#pragma once
 
+#pragma once
 #include <component/component.hpp>
 
 namespace Motion
 {
-    #define AM2903_LOG_PREFIX           "AM2903"
+    #define AM2903_LOG_PREFIX           "GF2 FBC Microcode Processor (AMD Am2903)"
     #define AM2903_INTERNAL_RAM_SIZE    16          // AM2903 Intenral ram size
 
     class AM2903
     {
-
+    public: 
         void Start();
-        void RunFunction();
+        void ExecuteUcodeAt(uint16_t addr);
         void Tick(); 
 
     private: 

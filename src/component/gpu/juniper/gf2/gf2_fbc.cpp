@@ -17,7 +17,7 @@ namespace Motion
         settings.buf = (uint8_t*)ucode;
         settings.bufSize = GF2_FBC_UCODE_SLICES * GF2_FBC_UCODE_STATES;
         settings.name = "FBC Microcode Editor";
-
+        
         fbcUcodeEditor = new CoherentEditor(this, settings);
         Coherent::RegisterExtension(fbcUcodeEditor);
     }
