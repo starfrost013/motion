@@ -46,8 +46,16 @@ add_subdirectory(src)
 # Setup our build type info
 if("${CMAKE_BUILD_TYPE}" STREQUAL "Debug")
     target_compile_definitions(motion PRIVATE DEBUG)
-    # Turn on ASan, O1 level optimisation (recommended by GOogle). -fno-omit-frame-pointer -fno-inline gives us much better debugging 
-    target_compile_options(motion PRIVATE -fsanitize=address -O0 -fno-omit-frame-pointer -fno-inline -U_FORTIFY_SOURCE)
+
+    # gcc doesn't support asan on windows...
+    if (WIN32 AND MINGW)
+        target_compile_options(motion PRIVATE -O0 -fno-omit-frame-pointer -fno-inline -U_FORTIFY_SOURCE)
+    else() 
+        # Turn on ASan, O1 level optimisation (recommended by GOogle). -fno-omit-frame-pointer -fno-inline gives us much better debugging 
+        target_compile_options(motion PRIVATE -fsanitize=address -O0 -fno-omit-frame-pointer -fno-inline -U_FORTIFY_SOURCE)
+        target_link_options(motion PRIVATE -fsanitize=address)
+    endif()
+    
 elseif("${CMAKE_BUILD_TYPE}" STREQUAL "Release")
     target_compile_definitions(motion PRIVATE RELEASE)
 elseif("${CMAKE_BUILD_TYPE}" STREQUAL "RelWithDebInfo")
