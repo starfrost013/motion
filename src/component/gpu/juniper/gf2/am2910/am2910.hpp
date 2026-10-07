@@ -45,6 +45,8 @@ namespace Motion
         /// @param nextUcode the microcode instruction to execute
         void YellAt2903(uint16_t nextUcode);
 
+        void Perform2903Op();
+
     private: 
         bool stackFull;
 

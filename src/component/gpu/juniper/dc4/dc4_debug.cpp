@@ -90,7 +90,7 @@ namespace Motion
             }
             else
             {
-                //  probably linearly addressed hopefulyl
+                // linearly addressed
                 for (int32_t i = 0; i < 16; i++)
                 {
                     ImGui::TextColored(CoherentUI::COLOUR_HEADER, "Map %d:", i);

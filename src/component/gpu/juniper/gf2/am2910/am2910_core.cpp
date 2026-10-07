@@ -54,12 +54,17 @@ namespace Motion
             
             uint8_t addrA = (word1 >> 12) & 0x0F;
             uint8_t addrB = word2 & 0x0F;
-            uint8_t seqop = (word2 >> 12) & 0x0F;
+            uint8_t seqop = (word2 >> 12) & 0x0F;                   // the 2903 op
             
             bool ccsel = word3 & 0x07;
             // don't need ram information
 
-            
+            // perform CCSEL 
+            switch (ccsel)
+            {
+                
+            }
+
 
             pcReg = next; // this it he only control flow
         }
@@ -71,6 +76,11 @@ namespace Motion
     }
 
     void AM2910::StackPop()
+    {
+
+    }
+
+    void AM2910::Perform2903Op()
     {
 
     }

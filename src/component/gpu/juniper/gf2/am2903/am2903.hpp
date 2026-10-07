@@ -24,11 +24,22 @@ namespace Motion
     #define AM2903_INTERNAL_RAM_SIZE    16          // AM2903 Intenral ram size
 
     // i1 field in ucode
-    #define AM2903_ALU_OP_HIGH          0           // If I0 = HIGH, Special Functions
-    #define AM2903_ALU_OP_SUB_SR        1           // F = S - R - 1 + Cn
-    #define AM2903_ALU_OP_SUB_RS        2           // F = R - S - 1 + Cn
-    #define AM2903_ALU_OP_ADD           3           // F = R + S + Cn
-
+    #define AM2903_ALU_OP_HIGH          0x0         // If I0 = HIGH, Special Functions
+    #define AM2903_ALU_OP_SUB_SR        0x1         // F = S - R - 1 + Cn
+    #define AM2903_ALU_OP_SUB_RS        0x2         // F = R - S - 1 + Cn
+    #define AM2903_ALU_OP_ADD           0x3         // F = R + S + Cn
+    #define AM2903_ALU_OP_ADD_S         0x4         // F = S + Cn
+    #define AM2903_ALU_OP_ADD_NOTS      0x5         // F = !S + Cn
+    #define AM2903_ALU_OP_ADD_R         0x6         // F = R + Cn
+    #define AM2903_ALU_OP_ADD_NOTR      0x7         // F = !R + Cn
+    #define AM2903_ALU_ZERO             0x8         // F = LOW
+    #define AM2903_ALU_AND_NOTR         0x9         // F = !R and S
+    #define AM2903_ALU_XNOR             0xA         // F = R XNOR S
+    #define AM2903_ALU_XOR              0xB         // F = R XOR S
+    #define AM2903_ALU_AND_R            0xC         // F = R AND S
+    #define AM2903_ALU_NOR              0xD         // F = R NOR S
+    #define AM2903_ALU_NAND             0xE         // F = R NAND S
+    #define AM2903_ALU_OR               0xF         // F = R OR S
 
     class AM2903
     {
