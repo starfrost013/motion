@@ -34,7 +34,7 @@
 #include <base/cvar/cvar.hpp>
 #include <base/cmdline/cmdline.hpp>
 
-#define APP_NAME            "motion"
+#define APP_NAME            "Motion"
 #define APP_SIGNON          "The SGI Emulator\n© 2026 starfrost and contributors\nOriginal hardware and software by Silicon Graphics, Inc. © 1981-1989"
 // This part will be replaced by some fancy GHA script later
 #define APP_VERSION         "0.3.0"

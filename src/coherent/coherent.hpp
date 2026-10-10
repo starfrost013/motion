@@ -18,6 +18,9 @@ namespace Motion
     #define COHERENT_LOG_PREFIX     "Debugger"
     #define COHERENT_VERSION        "Coherent v0.9"
 
+    // define this to change the emualtor name
+    #define COHERENT_EMULATOR_NAME  APP_NAME
+
     extern Cvar* startPaused;
 
     class CoherentCommand
