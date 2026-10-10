@@ -41,6 +41,8 @@ namespace Motion
     #define AM2903_ALU_NAND             0xE         // F = R NAND S
     #define AM2903_ALU_OR               0xF         // F = R OR S
 
+    #define AM2903_SPECIAL_MUL_UNSIGNED 0           
+
     class AM2903
     {
     public: 

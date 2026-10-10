@@ -119,6 +119,20 @@ namespace Motion
 
         void didExecuteException(Motion::Lisburn::M68kException exc, uint16_t vector) override { Coherent::Exception(vector); } ;
 
+        
+        // called when the cpu jumps to a subroutine
+        void didJumpToSubroutine(uint32_t oldpc, uint32_t newpc) override
+        {
+            Coherent::GetSystem()->PushCall32(newpc);
+        }
+
+        // Called when the cpu returns
+        void didReturnFromSubroutine(uint32_t oldpc, uint32_t newpc) override
+        {
+            // we don't care about this
+            Coherent::GetSystem()->PopCall32(newpc);
+        }
+
     private:
         mutable IP2Interrupt* interrupts;
     };

@@ -1374,6 +1374,8 @@ Moira::execBsr(u16 opcode)
     //           .b  .b  .b        .w  .w  .w        .l  .l  .l
     CYCLES_IP   (18, 18,  7,       18, 18,  7,       18, 18,  7)
 
+    didJumpToSubroutine(oldpc, reg.pc);
+
     FINALIZE
 }
 
@@ -4945,6 +4947,7 @@ Moira::execRtr(u16 opcode)
         throw AddressError(makeFrame<AE_SET_RW|AE_SET_DF>(reg.sp));
     }
 
+    u32 oldpc = reg.pc;
     u16 newccr = (u16)readM<C, M, Word>(reg.sp);
 
     reg.sp += 2;
@@ -4965,6 +4968,8 @@ Moira::execRtr(u16 opcode)
     //           00  10  20        00  10  20        00  10  20
     //           .b  .b  .b        .w  .w  .w        .l  .l  .l
     CYCLES_IP   ( 0,  0,  0,        0,  0,  0,       20, 20, 14)
+
+    didReturnFromSubroutine(oldpc, newpc);
 
     FINALIZE
 }

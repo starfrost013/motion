@@ -84,7 +84,7 @@ namespace Motion
     {
 
     }
-
+    
     /// @brief Basically goes HEY 2903, EXECUTE THIS MICROCODE NOW!
     /// @param nextUcode the microcode instruction to execute
     void AM2910::YellAt2903(uint16_t nextUcode)

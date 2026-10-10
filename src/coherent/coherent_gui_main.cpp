@@ -367,10 +367,8 @@ namespace Motion
 
         // draw the "top" of the window
         if (ImGui::BeginChild(headerText, size, ImGuiChildFlags_None, ImGuiWindowFlags_HorizontalScrollbar))
-        {                
-            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.1f, 0.8f, 1.0f, 1.0f));
-            ImGui::Text("%s", headerText); //shutup compiler by doing this
-            ImGui::PopStyleColor();
+        {              
+            ImGui::TextColored(CoherentUI::COLOUR_HEADER, "%s", headerText);
 
             // if the user clicked the add button or hit enter, add the guard
             bool createGuard = false;
@@ -441,19 +439,22 @@ namespace Motion
 
     void CoherentUI::DrawStackWindow(ImVec2 size)
     {
-
         if (ImGui::BeginChild("Stack", size, ImGuiChildFlags_None))
         {
+            ImGui::TextColored(CoherentUI::COLOUR_HEADER, "%s", "Call Stack");
             ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.1f, 0.8f, 1.0f, 1.0f));
-            ImGui::Text("%s", "Stack"); //shutup compiler by doing this
             ImGui::PopStyleColor();
 
             ImVec4 color = ImVec4(1.0, 1.0, 1.0, 1.0);
             
+            // Stack is treated as a FILO (first in last out)
+
+            uint64_t currentStackSize = Coherent::currentSystem->GetStackSize();
+
             // not yet started so do not bother
             if (Coherent::currentSystem->GetRunState() != CoherentSystem::RunState::NotYetStarted)
             {
-                for (int32_t offset = 0; offset < 8; offset++)
+                for (int32_t offset = 0; offset < currentStackSize; offset++)
                 {
                     switch (Coherent::currentSystem->GetWordSize())
                     {

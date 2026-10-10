@@ -26,12 +26,6 @@ namespace Motion
             this->moiraCpu = bridge;
         }
 
-        /// @brief for the coherent stack window
-        uint32_t GetStack32(uint32_t offset) override
-        {
-            return AddrSpace::PeekU32(moiraCpu->reg.sp + (offset << 2));
-        };
-
     private: 
         char disasmBuf[MOIRA_DISASM_BUF_SIZE] = {0};
         MC68020MoiraBridge* moiraCpu;

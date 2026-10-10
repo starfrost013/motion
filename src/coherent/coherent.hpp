@@ -99,6 +99,57 @@ namespace Motion
             WordSize64 = 0x3,
         };
 
+        // the stack used for the stack window
+
+        class StackBase
+        {
+        public: 
+            virtual void Push(std::any value) = 0;
+            virtual std::any At(size_t offset) = 0;
+            virtual std::any Pop() = 0;
+            virtual uint64_t Size() = 0;
+
+        };
+
+        template <typename T>
+        class Stack : public StackBase
+        {
+        public: 
+            void Push(std::any value) override
+            {
+                stack.push_back(std::any_cast<T>(value));
+            }
+
+            std::any Pop() override
+            {
+                if (stack.empty())
+                    return std::any{};
+
+                std::any first = stack.back();
+                stack.pop_back();
+                return first; 
+            }
+
+            std::any At(size_t offset) override
+            {
+                if (stack.empty())
+                    return std::any{};
+
+                if (offset >= stack.size())
+                    return std::any{};
+                    
+                return stack.at(offset);
+            }
+
+            uint64_t Size() override
+            {
+                return stack.size();
+            }
+
+        private: 
+            std::vector<T> stack;
+        }; 
+
         // BASE CLASS for exception vector
         class ExceptionVectorBase
         {
@@ -212,6 +263,7 @@ namespace Motion
         /// @brief might be slow. this really needs to have a custom access only iterators.
         std::vector<RegisterBase*> registers;
 
+
         /// getters for private fields
         size_t GetNextInstructionSize() { return nextInstructionSize; };
         /// @brief get the run state of the system
@@ -228,79 +280,130 @@ namespace Motion
 
         // we can't override templated virtual methods and this class is not really set up well for type erasure.
 
-        virtual uint8_t GetStack8(uint32_t offset) 
+        uint64_t GetStackSize()
+        {
+            return GetStack().Size();
+        }
+
+        uint8_t GetStack8(uint32_t offset) 
         { 
-            Logger::Log(COHERENT_LOG_PREFIX, "Coherent tried to call GetStack8 on a system but it didn't implement it. Check the word size");
-            return 0xFF;
+            auto stackAt = GetStack().At(offset);
+
+            if (stackAt.has_value())
+                return std::any_cast<uint8_t>(stackAt);
+            else
+                return 0x00; // defualt 0
         }
         
-        virtual uint16_t GetStack16(uint32_t offset) 
+        uint16_t GetStack16(uint32_t offset) 
         { 
-            Logger::Log(COHERENT_LOG_PREFIX, "Coherent tried to call GetStack16 on a system but it didn't implement it. Check the word size");
-            return 0xFFFF;
+            auto stackAt = GetStack().At(offset);
+
+            if (stackAt.has_value())
+                return std::any_cast<uint16_t>(stackAt);
+            else
+                return 0x00; // defualt 0
         }
 
-        virtual uint32_t GetStack32(uint32_t offset) 
+        uint32_t GetStack32(uint32_t offset) 
         { 
-            Logger::Log(COHERENT_LOG_PREFIX, "Coherent tried to call GetStack32 on a system but it didn't implement it. Check the word size");
-            return 0xFFFFFFFF;
+            auto stackAt = GetStack().At(offset);
+
+            if (stackAt.has_value())
+                return std::any_cast<uint32_t>(stackAt);
+            else
+                return 0x00; // defualt 0
         }
 
-        virtual uint64_t GetStack64(uint32_t offset) 
+        uint64_t GetStack64(uint32_t offset) 
         { 
-            Logger::Log(COHERENT_LOG_PREFIX, "Coherent tried to call GetStack64 on a system but it didn't implement it. Check the word size");
-            return (uint64_t)-1; // bignumber of fs
+            auto stackAt = GetStack().At(offset);
+
+            if (stackAt.has_value())
+                return std::any_cast<uint64_t>(stackAt);
+            else
+                return 0x00; // defualt 0
         }
 
-        virtual void PushCall8(uint32_t offset) 
+        // evil very bad probably
+        // the bridge between fixed-size cpu land and magical C++ templates! 
+
+        void PushCall8(uint8_t offset) 
         { 
-            Logger::Log(COHERENT_LOG_PREFIX, "Coherent tried to call PushCall8 on a system but it didn't implement it. Check the word size");
+            GetStack().Push(std::any_cast<uint8_t>(offset)); 
         }
         
-        virtual void PushCall16(uint32_t offset) 
+        void PushCall16(uint16_t offset) 
         { 
-            Logger::Log(COHERENT_LOG_PREFIX, "Coherent tried to call PushCall16 on a system but it didn't implement it. Check the word size");
+            GetStack().Push(std::any_cast<uint16_t>(offset)); 
         }
 
-        virtual void PushCall32(uint32_t offset) 
+        void PushCall32(uint32_t offset) 
         { 
-            Logger::Log(COHERENT_LOG_PREFIX, "Coherent tried to call PushCall32 on a system but it didn't implement it. Check the word size");
+            GetStack().Push(std::any_cast<uint32_t>(offset)); 
         }
 
-        virtual void PushCall64(uint32_t offset) 
+        void PushCall64(uint64_t offset) 
         { 
-            Logger::Log(COHERENT_LOG_PREFIX, "Coherent tried to call PushCall64 on a system but it didn't implement it. Check the word size");
+            GetStack().Push(std::any_cast<uint64_t>(offset)); 
         }
 
-        virtual uint8_t PopCall8(uint32_t offset) 
+        uint8_t PopCall8(uint8_t offset) 
         { 
-            Logger::Log(COHERENT_LOG_PREFIX, "Coherent tried to call PopCall8 on a system but it didn't implement it. Check the word size");
-            return 0xFF;
+            auto item = GetStack().Pop();
+
+            if (item.has_value()) // probably hould not ever be false
+                return std::any_cast<uint8_t>(item);
+            else
+                return 0x00;
         }
         
-        virtual uint16_t PopCall16(uint32_t offset) 
+        uint16_t PopCall16(uint16_t offset) 
         { 
-            Logger::Log(COHERENT_LOG_PREFIX, "Coherent tried to call PopCall16 on a system but it didn't implement it. Check the word size");
-            return 0xFFFF;
+            auto item = GetStack().Pop();
+
+            if (item.has_value()) // probably hould not ever be false
+                return std::any_cast<uint16_t>(item);
+            else
+                return 0x00;
         }
 
-        virtual uint32_t PopCall32(uint32_t offset) 
+        uint32_t PopCall32(uint32_t offset) 
         { 
-            Logger::Log(COHERENT_LOG_PREFIX, "Coherent tried to call PopCall32 on a system but it didn't implement it. Check the word size");
-            return 0xFFFFFFFF;
-        }
+            auto item = GetStack().Pop();
 
-        virtual uint64_t PopCall64(uint32_t offset) 
+            if (item.has_value()) // probably hould not ever be false
+                return std::any_cast<uint32_t>(item);
+            else
+                return 0x00;        
+            }
+
+        uint64_t PopCall64(uint64_t offset) 
         { 
-            Logger::Log(COHERENT_LOG_PREFIX, "Coherent tried to call PopCall64 on a system but it didn't implement it. Check the word size");
-            return (uint64_t)-1; // bignumber of fs
+            auto item = GetStack().Pop();
+
+            if (item.has_value()) // probably hould not ever be false
+                return std::any_cast<uint64_t>(item);
+            else
+                return 0x00;
         }
+        
+        /// @brief by default coherent provides a 32 bit stack. if you want a different stack you need to create a unique_ptr of the stack
+        /// @return the stack that your cpu will read and write to for the debugger stack window
+        virtual StackBase& GetStack() { return *stack; };
+
     protected: 
 
         inline static WordSize wordSize; 
         /// @brief the run state of the system
         inline static RunState runState;
         inline static size_t nextInstructionSize;
+
+        /// @brief  the stack. this is klutzy
+
+        // this is the first time that i have ever used smart pointers. By default the stack will be 32-bit
+        std::unique_ptr<StackBase> stack = std::make_unique<Stack<uint32_t>>();
+
     };
 
     class Coherent

@@ -229,6 +229,8 @@ took a big break, preventative to stop burnout
 * finally got the damn process going
 * fbc commands
 
+## 2026-10-10
+* made the stack a real stack that gets called on subroutine call
 
 v0.3.0 TODO:
 

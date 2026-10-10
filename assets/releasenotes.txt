@@ -8,7 +8,8 @@ Release Notes
     * Fix VRAM editor causing a memory leak on close
     * Logger 6.0: Fix many issues with logging:
         * Uses std:;string internally for memory safety
-
+        * Thread safe, runs on its own Thread
+    * Made the call stack window actually record the callstack. it captures rtr, rts, bsr and jsr. maybe it should ctach others like e.g. modules
 
 0.2.0 (September 5, 2026)
 ** Motion can now boot GL2 Unix in serial mode only. A disk image is provided at: xxxxx**
