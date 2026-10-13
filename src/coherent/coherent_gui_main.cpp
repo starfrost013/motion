@@ -22,8 +22,8 @@ namespace Motion
         if (ImGui::Begin("About", &CoherentUI::aboutActive))
         {
             ImGui::TextColored(ImVec4(0.2f, 1.0f, 0.2f, 1.0f), COHERENT_VERSION " (for " COHERENT_EMULATOR_NAME ")");
-            ImGui::Text("An architecture-agnostic, retargetable, embedded debugger for emulators");
-            ImGui::Text("© 2026 starfrost:");
+            ImGui::Text("An architecture-agnostic, symbolic, retargetable, embedded debugger for emulators");
+            ImGui::Text("© 2026 starfrost @ ");
             ImGui::SameLine();
             ImGui::TextLinkOpenURL("https://starfrost.net/");
 

@@ -88,7 +88,7 @@
 #define MOTION_ASSERT_WARNING(cond, msg)        if (cond) \
                                                     Logger::Log(std::format("***** ASSERTION FAILED (WARNING) *****\n{}", msg).c_str(), LogChannels::Warning)
 #define MOTION_ASSERT_ERROR(cond, msg)          if (cond) \
-                                                    Logger::Log(std::format("***** ASSERTION FAILED (WARNING) *****\n{}", msg).c_str(), LogChannels::Error) 
+                                                    Logger::Log(std::format("***** ASSERTION FAILED (ERROR) *****\n{}", msg).c_str(), LogChannels::Error) 
 #define MOTION_ASSERT_FATAL(cond, msg)          if (cond) \
                                                     Logger::Log(std::format("***** ASSERTION FAILED *****\n{}", msg).c_str(), LogChannels::FatalError) 
 #define MOTION_ASSERT_UNSAFE(cond, msg)         if (cond) \
