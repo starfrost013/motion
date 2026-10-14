@@ -24,6 +24,26 @@ namespace Motion
 
     #define COHERENT_SYMBOL_LOG_PREFIX          "Coherent Symbolic Debugger"
     
+    /// @brief the symbol editor coherent exteension
+    class CoherentExtensionSymbolEditor : public CoherentExtension
+    {
+    public:
+        CoherentExtensionSymbolEditor() : CoherentExtension(nullptr) {}
+
+        static void Init();
+        static void Shutdown();
+
+        void AddUI() override;
+
+        CoherentExtensionType GetExtensionType() override { return CoherentExtensionType::CustomMenuItem; }; 
+        const char* GetName() override { return "Symbol Set Editor"; };
+
+        virtual bool GetCoherentInternal() { return true; };
+
+    private: 
+        inline static CoherentExtensionSymbolEditor* singleton; 
+    };
+
     /// @brief the type of symbol 
     enum CoherentSymbolType
     {
@@ -98,8 +118,4 @@ namespace Motion
 
         
     };
-
-
-
- 
 };

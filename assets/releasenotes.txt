@@ -8,8 +8,13 @@ Release Notes
     * Fix VRAM editor causing a memory leak on close
     * Logger 6.0: Fix many issues with logging:
         * Uses std:;string internally for memory safety
-        * Thread safe, runs on its own Thread
+        * Thread safe, runs on its own thread
     * Made the call stack window actually record the callstack. it captures rtr, rts, bsr and jsr. maybe it should ctach others like e.g. modules
+        * Coherent::GetStack** cannot be overridden anymore
+
+    * Coherent now has the concept of internal and external extensions. An internal extension is created by overriding the method bool CoherentExtension::GetCoherentInternal() to cause it to return true.
+        * These don't have to be attached to any component and usually manage their own lifetimes using INit and Shutdown methods called by Coherent, and a singleton. 
+          These extensions are only for Coherent developers themselves
 
 0.2.0 (September 5, 2026)
 ** Motion can now boot GL2 Unix in serial mode only. A disk image is provided at: xxxxx**

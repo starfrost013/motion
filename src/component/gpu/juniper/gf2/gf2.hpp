@@ -188,7 +188,7 @@ namespace Motion
 
         /// @brief Set the menu option name. If this is not called the component name will be used as the menu name.
         /// @param name The menu name to use
-        const char* GetMenuName() override { return "GF2 (Graphics Debug)"; };
+        const char* GetName() override { return "GF2 (Graphics Debug)"; };
     };
 
     class GF2 : public Component

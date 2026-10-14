@@ -8,6 +8,7 @@
 */
 
 #include <coherent/coherent.hpp>
+#include <coherent/coherent_symbol.hpp>
 
 namespace Motion
 {
@@ -36,7 +37,12 @@ namespace Motion
         Logger::Log(COHERENT_LOG_PREFIX, COHERENT_VERSION " initialised");
         Logger::settings.SetPostLogFunction(Coherent_CTrampolineForLog);
         CoherentUI::InitStyle(CoherentUI::UIStyle::Default);
+
+        // initialise internal extensions
+        CoherentExtensionSymbolEditor::Init();
+    
         initialised = true; 
+
     }
 
     void Coherent::Enter()
@@ -88,6 +94,10 @@ namespace Motion
     void Coherent::Shutdown()
     {
         Leave();
+
+        // shut down internal extensions
+        CoherentExtensionSymbolEditor::Shutdown();
+
         currentSystem->Shutdown();
         Logger::settings.SetPostLogFunction(nullptr);
     }
@@ -104,14 +114,19 @@ namespace Motion
             return; 
         }
 
-        if (!extension->component)
+        if (!extension->component
+        && !extension->GetCoherentInternal())
         {
-            Logger::Log(COHERENT_LOG_PREFIX, "Coherent::RegisterExtension - extension->component == NULLPTR!", LogChannels::Error);
+            Logger::Log(COHERENT_LOG_PREFIX, "Coherent::RegisterExtension - extension->component == NULLPTR and not CoherentInternal!", LogChannels::Error);
             return; 
         }
 
         extensions.push_back(extension);
-        Logger::Log(COHERENT_LOG_PREFIX, std::format("Coherent registered an extension for the component {}", extension->component->GetName()).c_str(), LogChannels::Debug);
+
+        if (extension->GetCoherentInternal())
+            Logger::Log(COHERENT_LOG_PREFIX, std::format("Coherent registered an internal extension for the component {}", extension->GetName()).c_str(), LogChannels::Debug);
+        else
+            Logger::Log(COHERENT_LOG_PREFIX, std::format("Coherent registered an external extension for the component {}", extension->component->GetName()).c_str(), LogChannels::Debug);
     }
 
     //

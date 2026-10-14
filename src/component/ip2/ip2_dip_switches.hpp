@@ -18,7 +18,7 @@ namespace Motion
         CoherentExtensionIP2Switches(Component* owner) : CoherentExtension(owner) {}
 
         CoherentExtensionType GetExtensionType() override { return CoherentExtensionType::CustomMenu; }; 
-        const char* GetMenuName() override { return "Backpanel Switches"; };
+        const char* GetName() override { return "Backpanel Switches"; };
 
         void AddUI() override;
     };

@@ -70,7 +70,7 @@ namespace Motion
 
                     for (CoherentExtension* extension : Coherent::extensions)
                     {
-                        const char* name = extension->GetMenuName();
+                        const char* name = extension->GetName();
 
                         if (extension->GetExtensionType() == CoherentExtensionType::PeripheralsMenu)
                         {
@@ -86,7 +86,7 @@ namespace Motion
                 // Add custom menu type extensions
                 for (CoherentExtension* extension : Coherent::extensions)
                 {
-                    const char* name = extension->GetMenuName();
+                    const char* name = extension->GetName();
 
                     if (extension->GetExtensionType() == CoherentExtensionType::CustomMenu)
                     {

@@ -79,8 +79,11 @@ namespace Motion
 
         /// @brief Set the menu option name for custom menu type items. If this is not overridden the component name will be used as the menu name.
         /// @param name The menu name to use. Default is the componet name.
-        virtual const char* GetMenuName() { return component->GetName(); };
+        virtual const char* GetName() { return component->GetName(); };
 
+        /// @brief Determines if an extension is a coherent internal extension. If this is true it does not have an attached component and usually manage themselves with a singleton.
+        /// @return A boolean indicating if this component is coherent internal (set in code)
+        virtual bool GetCoherentInternal() { return false; };
         // Setters for private methods
 
 
@@ -542,5 +545,7 @@ namespace Motion
 
         // automatically break on exception fired
         inline static bool breakOnException;
+
+        
     };
 }

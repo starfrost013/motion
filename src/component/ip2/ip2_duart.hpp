@@ -171,7 +171,7 @@ namespace Motion
         void AddUI() override;
 
         CoherentExtensionType GetExtensionType() override { return CoherentExtensionType::CustomMenuItem; }; 
-        const char* GetMenuName() override { return "System Console"; };
+        const char* GetName() override { return "System Console"; };
     private: 
         void DrawChannelUI(DUART68681* duartComponent, int32_t duartId, int32_t channelId);
         void DrawConsole(SerialLine& line, int32_t lineNum, float outputHeight);
