@@ -86,7 +86,7 @@ namespace Motion
                 // Add custom menu type extensions
                 for (CoherentExtension* extension : Coherent::extensions)
                 {
-                    const char* name = extension->component->GetName();
+                    const char* name = extension->GetMenuName();
 
                     if (extension->GetExtensionType() == CoherentExtensionType::CustomMenu)
                     {
