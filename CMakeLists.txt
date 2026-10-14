@@ -10,16 +10,26 @@
 cmake_minimum_required(VERSION 3.20)
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+# set platform name
+if (WIN32)
+    set(MOTION_PLATFORM "win64")
+elseif(APPLE)
+    set(MOTION_PLATFORM "macos")
+elseif(UNIX AND NOT APPLE)
+    set(MOTION_PLATFORM "linux") # could also be BSD
+endif()
+
 # $<CONFIG> rather than ${CMAKE_BUILD_TYPE}: specify with -DCMAKE_BUILD_TYPE
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/output/$<CONFIG>)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/output/$<CONFIG>/${MOTION_PLATFORM})
 
 # mingw-w64 doesn't support static linking against the UCRT
 
 # Install path
 set(ROM_SRC_DIR "${CMAKE_SOURCE_DIR}/roms")
-set(ROM_DST_DIR "${CMAKE_BINARY_DIR}/output/$<CONFIG>/roms")
+set(ROM_DST_DIR "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/roms")
 set(ASSET_SRC_DIR "${CMAKE_SOURCE_DIR}/assets")
-set(ASSET_DST_DIR "${CMAKE_BINARY_DIR}/output/$<CONFIG>/assets")
+set(ASSET_DST_DIR "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/assets")
 
 project(motion)
 
