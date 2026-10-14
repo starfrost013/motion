@@ -81,5 +81,6 @@ add_executable(motion
     component/gpu/juniper/gf2/gf2_debug.cpp
     component/gpu/juniper/gf2/am2910/am2910_core.cpp
     coherent/coherent_symbol_format.cpp
+    coherent/coherent_symbol_editor.cpp
 )
 
