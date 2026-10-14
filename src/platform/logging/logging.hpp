@@ -382,7 +382,7 @@ namespace LOGGER_NAMESPACE
 
             // needs to be universal for all project
             #ifdef RELEASE
-            if (channelMask == LogChannels::Debug)
+            if (message.channelMask == LogChannels::Debug)
                 return;
             #endif
 
