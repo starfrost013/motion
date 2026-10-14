@@ -26,6 +26,7 @@
 //                                      Logger now runs on its own thread
 //                                      Remove "NextGen" branding, change to simply "C++"
 //                                      Use std::string internally inside logger to ensure memory safety and correct copying behaviour
+// 6.0.1            October 14, 2026    Fix release builds
 
 #pragma once
 
@@ -50,7 +51,7 @@
 
 // Strings, change to localise or whatever
 
-#define STRING_VERSION                  "6.0.0 (September 17, 2026)"            // Version number as a string (we don't need it in any other form)
+#define STRING_VERSION                  "6.0.1 (October 14, 2026)"              // Version number as a string (we don't need it in any other form)
 #define STRING_SIGN_ON                  "Starfrost Shared Logging System (C++) " STRING_VERSION " initialised" 
 #define STRING_ANSI_PREFIX              "\x1B["                                 // Some ANSI commands use this as a prefix
 

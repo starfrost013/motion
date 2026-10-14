@@ -232,6 +232,10 @@ took a big break, preventative to stop burnout
 ## 2026-10-10
 * made the stack a real stack that gets called on subroutine call
 
+## 2026-10-14
+* started workgin on symbol format. csym read/write.
+* finally platform specific build directories
+
 v0.3.0 TODO:
 
 * GE and FBC!!!!!!!
