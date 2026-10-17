@@ -1,4 +1,3 @@
-
 /*
     C    O    H    E    R    E    N    T
     Extensible Emulator Debugging Tools!
@@ -24,10 +23,16 @@ namespace Motion
 
     extern Cvar* startPaused;
 
-
+    /// @brief a coherent command
     class CoherentCommand
     {
+    public: 
         char name[STRING_MAX_SHORT];
+    
+        /// @brief execute the command,
+        /// @param params a char* to the parameters
+        /// @return a boolean indicating if the command was successfully executed 
+        virtual bool Execute(char* params) { return true; }; 
     };
 
     // enumerates types of coherent extensions
@@ -112,6 +117,14 @@ namespace Motion
 
     private: 
         inline static CoherentExtensionSymbolEditor* singleton; 
+        inline static CoherentSymbolSet symbolSet; 
+
+        inline static char symbolNameBuf[STRING_MAX_LONG] = {0};
+        inline static char addressBuf[STRING_MAX_SHORT] = {0};
+        inline static bool offsetAddressChecked = false;
+
+        static void LoadCurrentSet(const char* fileName);
+        static void SaveCurrentSet(const char* fileName);
     };
 
     /// @brief Defines a coherent system. A system is e.g. a CPU which is being debugged

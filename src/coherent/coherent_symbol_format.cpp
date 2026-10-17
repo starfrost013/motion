@@ -27,12 +27,12 @@ namespace Motion
         if (write)
             flags = (FileFlags)(FileFlags::Binary | FileFlags::CreateOrOpen);
 
-        file = Filesystem::Open(fileName, FileFlags::Binary); 
+        file = Filesystem::Open(fileName, flags); 
 
         if (file == nullptr)
             Logger::Log(COHERENT_SYMBOL_LOG_PREFIX, std::format("CoherentSymbolFormat::OpenFile - Failed to open file {} for {}!", fileName, (write) ? "writing" : "reading").c_str(), LogChannels::Error);
 
-        return (file == nullptr);
+        return (file != nullptr);
     }
 
     void CoherentSymbolFormatCsym::Read(const char* fileName, CoherentSymbolSet& set)
@@ -106,7 +106,7 @@ namespace Motion
 
     void CoherentSymbolFormatCsym::Write(const char* fileName, CoherentSymbolSet& set)
     {
-        if (!OpenFile(fileName))
+        if (!OpenFile(fileName, true))
             return;
 
         CoherentSymbolFormatCsym::Header header; 
@@ -116,14 +116,22 @@ namespace Motion
         header.nrOfSymbols = set.symbols.size();
         header.exeBaseAddress = set.baseAddress;
 
+        file->stream.write((char*)&(header), sizeof(CoherentSymbolFormatCsym::Header));
+
+        Logger::Log(COHERENT_SYMBOL_LOG_PREFIX, "Wrote .CSYM header", LogChannels::Debug);
+
+        uint64_t numSymbolsWritten = 0; 
         // write out the symbols 
         for (const auto& [key, value] : set.symbols)
         {
             file->stream.write((char*)(&(value.offset)), sizeof(CoherentSymbol));
             file->stream.write((char*)(&(value.type)), sizeof(CoherentSymbolType));
             file->stream.write((char*)(&(value.length)), sizeof(uint64_t));
-            file->stream.write((char*)(&(value.nameLength)), sizeof(uint16_t));         
+            file->stream.write((char*)(&(value.nameLength)), sizeof(uint16_t));    
+            numSymbolsWritten++;     
         }
+
+        Logger::Log(COHERENT_SYMBOL_LOG_PREFIX, std::format("Wrote {} symbols to .CSYM folder", numSymbolsWritten).c_str(), LogChannels::Debug);
 
         Filesystem::Close(file);
     }
