@@ -11,6 +11,7 @@
 #include <base/emulation.hpp>
 #include <component/addrspace.hpp>
 #include <component/component.hpp>
+#include <coherent/coherent_symbol.hpp>
 #include <coherent/coherent_gui_imgui.hpp>
 
 namespace Motion
@@ -22,6 +23,7 @@ namespace Motion
     #define COHERENT_EMULATOR_NAME  APP_NAME
 
     extern Cvar* startPaused;
+
 
     class CoherentCommand
     {
@@ -89,6 +91,27 @@ namespace Motion
 
     private:
         std::vector<CoherentCommand*> commands;
+    };
+
+    /// @brief the symbol editor coherent exteension.
+    /// defined here because of the fact that coherent_symbol.hpp cannot be dependent on coherent.hpp
+    class CoherentExtensionSymbolEditor : public CoherentExtension
+    {
+    public:
+        CoherentExtensionSymbolEditor() : CoherentExtension(nullptr) {}
+
+        static void Init();
+        static void Shutdown();
+
+        void AddUI() override;
+
+        CoherentExtensionType GetExtensionType() override { return CoherentExtensionType::CustomMenuItem; }; 
+        const char* GetName() override { return "Symbol Set Editor"; };
+
+        virtual bool GetCoherentInternal() { return true; };
+
+    private: 
+        inline static CoherentExtensionSymbolEditor* singleton; 
     };
 
     /// @brief Defines a coherent system. A system is e.g. a CPU which is being debugged
