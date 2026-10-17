@@ -271,12 +271,9 @@ namespace LOGGER_NAMESPACE
         {
             while (initialised)
             {
-                if (queue.AnythingToDo())
-                {
+                if (queue.AnythingToDo()) // if we have anything that the other threads sent it, go
                     LogNextMessage();
-                }
             }
-
         }
         
         /// @brief Adds a custom channel to the logger.

@@ -510,6 +510,7 @@ namespace Motion
         // Getters for private members
         static bool GetInitialised() { return initialised; };
         static CoherentSystem* GetSystem() { return currentSystem; };
+        static CoherentSymbolSet GetCurrentSymbolSet() { return currentSymbolSet; };
 
         // Setters for private members
         static void SetSystem(CoherentSystem* system) 
@@ -523,10 +524,12 @@ namespace Motion
                 currentSystem->SetRunState(CoherentSystem::RunState::NotYetStarted);
             }
         }; 
-        
+
+        static void SetCurrentSymbolSet(CoherentSymbolSet symSet) { currentSymbolSet = symSet; };
+
+
         /// @brief If this is true, the coherent system is currently active. (needs to be public because of imgui)
         inline static bool active;
-
 
     private:
         /// @brief If this value is true, the coherent system has been initialised. 
@@ -546,6 +549,6 @@ namespace Motion
         // automatically break on exception fired
         inline static bool breakOnException;
 
-        
+        inline static CoherentSymbolSet currentSymbolSet;
     };
 }
