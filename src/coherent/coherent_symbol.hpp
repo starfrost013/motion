@@ -18,7 +18,7 @@ namespace Motion
     // CSYM stuff
     #define COHERENT_SYMBOL_FORMAT_EXTENSION    ".csym"
     #define COHERENT_SYMBOL_FORMAT_VERSION      1
-    #define COHERENT_SYMBOL_FORMAT_MAGIC        0x746E657265685F43  // Coherent
+    #define COHERENT_SYMBOL_FORMAT_MAGIC        0x746E657265686F43  // Coherent
     #define COHERENT_SYMBOL_RESERVE             128                 // reserve symbols to prevent massive amount of resizing while reading small files
 
     #define COHERENT_SYMBOL_LOG_PREFIX          "Coherent Symbolic Debugger"
