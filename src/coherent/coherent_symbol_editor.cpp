@@ -68,6 +68,10 @@ namespace Motion
             ImGui::SameLine();
             ImGui::Checkbox("Use Offset Addresses", &offsetAddressChecked);
 
+            ImGui::Text("Symbol Type:");
+            ImGui::SameLine();
+            ImGui::Combo("##SymbolTypeDropdown", &symbolSelectedType, "Function\0Global\0Struct Record\0Struct Field\0\0"); // MUST END WITH TWO NULL BYTES
+
             ImGui::TextColored(CoherentUI::COLOUR_HEADER, "Symbols");
             
             if (ImGui::Button("Load from .csym"))

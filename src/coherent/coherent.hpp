@@ -122,6 +122,7 @@ namespace Motion
         inline static char symbolNameBuf[STRING_MAX_LONG] = {0};
         inline static char addressBuf[STRING_MAX_SHORT] = {0};
         inline static bool offsetAddressChecked = false;
+        inline static int32_t symbolSelectedType = 0;
 
         static void LoadCurrentSet(const char* fileName);
         static void SaveCurrentSet(const char* fileName);

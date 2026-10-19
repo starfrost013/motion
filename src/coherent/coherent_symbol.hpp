@@ -52,6 +52,13 @@ namespace Motion
         char name[COHERENT_SYMBOL_NAME_MAX_LENGTH];
     }; 
 
+    /// @brief enumerates the search modes
+    enum CoherentSymbolSearchMode
+    {
+        Absolute = 0,   // search on the basis of absolute addressing
+        Relative = 1,   // search on the basis of relative addressing
+    };
+
     /// @brief a symbolic information set
     class CoherentSymbolSet
     {
@@ -63,6 +70,9 @@ namespace Motion
         {
             symbols.reserve(COHERENT_SYMBOL_RESERVE);
         }
+
+        CoherentSymbol* ResolveAddress(uint64_t address);
+    
     };
 
     /// @brief a symbol file format
@@ -87,10 +97,10 @@ namespace Motion
     public:
         struct Header
         {
-            uint64_t magic;
-            uint8_t version; 
-            uint64_t nrOfSymbols;       // with the rise of ai 4,294,967,296 symbols is no longer a dream 
-            uint64_t exeBaseAddress;    // base address for binary, for e.g. IDA Pro import
+            uint64_t magic = 0;
+            uint8_t version = 0; 
+            uint64_t nrOfSymbols = 0;     // with the rise of ai 4,294,967,296 symbols is no longer a dream 
+            uint64_t exeBaseAddress = 0;  // base address for binary, for e.g. IDA Pro import
         };
 
         static void Read(const char* fileName, CoherentSymbolSet& set);

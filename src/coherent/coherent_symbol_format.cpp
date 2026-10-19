@@ -25,7 +25,7 @@ namespace Motion
         FileFlags flags = FileFlags::Binary;
 
         if (write)
-            flags = (FileFlags)(FileFlags::Binary | FileFlags::CreateOrOpen);
+            flags = (FileFlags)(FileFlags::Binary | FileFlags::Create);
 
         file = Filesystem::Open(fileName, flags); 
 
@@ -34,6 +34,10 @@ namespace Motion
 
         return (file != nullptr);
     }
+
+    ///
+    // CoherentSymbolFormatCsym
+    ///
 
     void CoherentSymbolFormatCsym::Read(const char* fileName, CoherentSymbolSet& set)
     {
@@ -134,5 +138,24 @@ namespace Motion
         Logger::Log(COHERENT_SYMBOL_LOG_PREFIX, std::format("Wrote {} symbols to .CSYM folder", numSymbolsWritten).c_str(), LogChannels::Debug);
 
         Filesystem::Close(file);
+    }
+
+    ///
+    // CoherentSymbolSet
+    ///
+
+    /// @brief resolve an address to a symbol
+    /// @param address 
+    CoherentSymbol* CoherentSymbolSet::ResolveAddress(uint64_t address)
+    {
+        // linear search for now. if it's slow change it 
+        for (auto& [ key, value ] : symbols)
+        {
+            if (address >= (value.offset)
+            && address < (value.offset + value.length)) // range is [inclusive,exclusive]
+                return &value; // c+=26 use std::optional ???????????????????
+        }
+
+        return nullptr;
     }
 }
