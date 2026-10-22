@@ -136,7 +136,7 @@ namespace Motion
             numSymbolsWritten++;   
         }
 
-        Logger::Log(COHERENT_SYMBOL_LOG_PREFIX, std::format("Wrote {} symbols to .CSYM folder", numSymbolsWritten).c_str(), LogChannels::Debug);
+        Logger::Log(COHERENT_SYMBOL_LOG_PREFIX, std::format("Wrote {} symbols to .CSYM file", numSymbolsWritten).c_str(), LogChannels::Debug);
 
         Filesystem::Close(file);
     }

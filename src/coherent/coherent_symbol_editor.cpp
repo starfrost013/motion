@@ -48,7 +48,7 @@ namespace Motion
 
             ImGui::Text("Base Address: ");
             ImGui::SameLine();
-            ImGui::InputScalar("##BaseAddressInput", ImGuiDataType_U64, &symbolSet.baseAddress, &step, &stepFast, "%d", ImGuiInputTextFlags_CharsHexadecimal | ImGuiInputTextFlags_EnterReturnsTrue);
+            ImGui::InputScalar("##BaseAddressInput", ImGuiDataType_U64, &symbolSet.baseAddress, &step, &stepFast, "%16llX", ImGuiInputTextFlags_CharsHexadecimal | ImGuiInputTextFlags_EnterReturnsTrue);
 
             ImGui::TextColored(CoherentUI::COLOUR_HEADER, "New Symbol");
             ImGui::Text("Symbol Name: ");
@@ -68,7 +68,9 @@ namespace Motion
             ImGui::SameLine();
             ImGui::Checkbox("Use Offset Addresses", &offsetAddressChecked);
 
-            ImGui::InputScalar("Length (optional)", ImGuiDataType_U64, &symbolSizeBuf, &step, &stepFast, "%d", ImGuiInputTextFlags_CharsHexadecimal | ImGuiInputTextFlags_EnterReturnsTrue);
+            ImGui::Text("Length (optional)");
+            ImGui::SameLine();
+            ImGui::InputScalar("##LengthInput", ImGuiDataType_U64, &symbolSizeBuf, &step, &stepFast, "%16llX", ImGuiInputTextFlags_CharsHexadecimal | ImGuiInputTextFlags_EnterReturnsTrue);
             ImGui::Text("If you don't put a length in, it will try to determine the length for you while writing");
 
             ImGui::Text("Symbol Type:");
@@ -89,7 +91,34 @@ namespace Motion
             }
 
             ImGui::TextColored(CoherentUI::COLOUR_HEADER, "Symbols");
-            
+
+            int32_t symbolId = 0;
+
+            for (auto& [key, value] : symbolSet.symbols) // has side efefcts ?!
+            {
+                const char* typeStr = "Function";
+
+                switch (value.type)
+                {
+                    case CoherentSymbolType::Global:
+                        typeStr = "Global";
+                        break;
+                    case CoherentSymbolType::StructEntry:
+                        typeStr = "Struct Entry";
+                        break;
+                    case CoherentSymbolType::StructRecord:
+                        typeStr = "Struct Record";
+                        break;
+                }
+
+                ImGui::Text("0x%lX: Symbol %d (%s):", value.offset, symbolId, typeStr);
+                ImGui::SameLine(); // name highlighed
+                char* name = value.GetName();
+                ImGui::TextColored(CoherentUI::COLOUR_HEADER, name);
+
+                symbolId++;
+            } 
+
             if (ImGui::Button("Load from .csym"))
                 LoadCurrentSet("test0000.csym");
             
