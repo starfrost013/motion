@@ -43,7 +43,9 @@ namespace Motion
     {
         if (!OpenFile(fileName))
             return;
-        
+      
+        CoherentSymbol symbol;
+
         CoherentSymbolFormatCsym::Header header;
         file->stream.read((char*)(&header), sizeof(CoherentSymbolFormatCsym::Header));
         
@@ -65,13 +67,11 @@ namespace Motion
             goto done;          
         }
 
-        CoherentSymbol symbol;
 
         for (uint64_t i = 0; i < header.nrOfSymbols; i++)
         {
             file->stream.read((char*)(&(symbol.offset)), sizeof(CoherentSymbol));
             file->stream.read((char*)(&(symbol.type)), sizeof(CoherentSymbolType));
-            file->stream.read((char*)(&(symbol.length)), sizeof(uint64_t));
             file->stream.read((char*)(&(symbol.nameLength)), sizeof(uint16_t));
 
             // make sure the name length is sane
@@ -146,8 +146,12 @@ namespace Motion
 
     /// @brief resolve an address to a symbol
     /// @param address 
-    CoherentSymbol* CoherentSymbolSet::ResolveAddress(uint64_t address)
+    CoherentSymbol* CoherentSymbolSet::ResolveAddress(uint64_t address, CoherentSymbolSearchMode searchMode)
     {
+        // subtract to get absolute addr
+        if (searchMode == CoherentSymbolSearchMode::Absolute)
+            address -= baseAddress;
+
         // linear search for now. if it's slow change it 
         for (auto& [ key, value ] : symbols)
         {

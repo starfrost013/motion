@@ -53,7 +53,7 @@ namespace Motion
             ImGui::TextColored(CoherentUI::COLOUR_HEADER, "New Symbol");
             ImGui::Text("Symbol Name: ");
             ImGui::SameLine();
-            ImGui::InputTextWithHint("##SymbolNameInput", "Enter name...", symbolNameBuf, STRING_MAX_LONG, ImGuiInputTextFlags_CharsHexadecimal | ImGuiInputTextFlags_EnterReturnsTrue);
+            ImGui::InputTextWithHint("##SymbolNameInput", "Enter name...", symbolNameBuf, STRING_MAX_LONG, ImGuiInputTextFlags_EnterReturnsTrue);
 
             ImGui::Text("Address: ");
             ImGui::SameLine();
@@ -68,9 +68,25 @@ namespace Motion
             ImGui::SameLine();
             ImGui::Checkbox("Use Offset Addresses", &offsetAddressChecked);
 
+            ImGui::InputScalar("Length (optional)", ImGuiDataType_U64, &symbolSizeBuf, &step, &stepFast, "%d", ImGuiInputTextFlags_CharsHexadecimal | ImGuiInputTextFlags_EnterReturnsTrue);
+            ImGui::Text("If you don't put a length in, it will try to determine the length for you while writing");
+
             ImGui::Text("Symbol Type:");
             ImGui::SameLine();
             ImGui::Combo("##SymbolTypeDropdown", &symbolSelectedType, "Function\0Global\0Struct Record\0Struct Field\0\0"); // MUST END WITH TWO NULL BYTES
+
+            if (ImGui::Button("Add"))
+            {
+                CoherentSymbol symbol;
+
+                symbol.type = (CoherentSymbolType)symbolSelectedType;
+                symbol.offset = atoi(addressBuf);
+                symbol.SetName(symbolNameBuf);
+                symbol.length = symbolSizeBuf;
+
+                // copy it in
+                symbolSet.symbols[symbol.offset] = symbol;
+            }
 
             ImGui::TextColored(CoherentUI::COLOUR_HEADER, "Symbols");
             

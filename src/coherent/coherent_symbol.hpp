@@ -40,13 +40,14 @@ namespace Motion
 
     public:  
         uint64_t offset;                // relative(?) address of 
-        uint64_t length;                // length
+        uint64_t length = 0xFFFFFFFF;   // length (fffffff = auto)
         uint16_t nameLength;            // limit name length to reduce size
         CoherentSymbolType type; 
         // Getters for privates
         char* GetName() { return name; }; 
 
         // Setters for privates
+        void SetName(const char* name) { strncpy(this->name, name, COHERENT_SYMBOL_NAME_MAX_LENGTH); };
 
     private: 
         char name[COHERENT_SYMBOL_NAME_MAX_LENGTH];
@@ -71,7 +72,7 @@ namespace Motion
             symbols.reserve(COHERENT_SYMBOL_RESERVE);
         }
 
-        CoherentSymbol* ResolveAddress(uint64_t address);
+        CoherentSymbol* ResolveAddress(uint64_t address, CoherentSymbolSearchMode searchMode = CoherentSymbolSearchMode::Relative);
     
     };
 
