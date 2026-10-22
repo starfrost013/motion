@@ -48,7 +48,7 @@ namespace Motion
 
             ImGui::Text("Base Address: ");
             ImGui::SameLine();
-            ImGui::InputScalar("##BaseAddressInput", ImGuiDataType_U64, &symbolSet.baseAddress, &step, &stepFast, "%16llX", ImGuiInputTextFlags_CharsHexadecimal | ImGuiInputTextFlags_EnterReturnsTrue);
+            ImGui::InputScalar("##BaseAddressInput", ImGuiDataType_U64, &symbolSet.baseAddress, &step, &stepFast, "%lX", ImGuiInputTextFlags_CharsHexadecimal | ImGuiInputTextFlags_EnterReturnsTrue);
 
             ImGui::TextColored(CoherentUI::COLOUR_HEADER, "New Symbol");
             ImGui::Text("Symbol Name: ");
@@ -70,7 +70,7 @@ namespace Motion
 
             ImGui::Text("Length (optional)");
             ImGui::SameLine();
-            ImGui::InputScalar("##LengthInput", ImGuiDataType_U64, &symbolSizeBuf, &step, &stepFast, "%16llX", ImGuiInputTextFlags_CharsHexadecimal | ImGuiInputTextFlags_EnterReturnsTrue);
+            ImGui::InputScalar("##LengthInput", ImGuiDataType_U64, &symbolSizeBuf, &step, &stepFast, "%lX", ImGuiInputTextFlags_CharsHexadecimal | ImGuiInputTextFlags_EnterReturnsTrue);
             ImGui::Text("If you don't put a length in, it will try to determine the length for you while writing");
 
             ImGui::Text("Symbol Type:");
@@ -113,8 +113,7 @@ namespace Motion
 
                 ImGui::Text("0x%lX: Symbol %d (%s):", value.offset, symbolId, typeStr);
                 ImGui::SameLine(); // name highlighed
-                char* name = value.GetName();
-                ImGui::TextColored(CoherentUI::COLOUR_HEADER, name);
+                ImGui::TextColored(CoherentUI::COLOUR_HEADER, value.GetName());
 
                 symbolId++;
             } 
