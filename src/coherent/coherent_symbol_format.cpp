@@ -128,11 +128,12 @@ namespace Motion
         // write out the symbols 
         for (const auto& [key, value] : set.symbols)
         {
-            file->stream.write((char*)(&(value.offset)), sizeof(CoherentSymbol));
+            file->stream.write((char*)(&(value.offset)), sizeof(uint64_t));
             file->stream.write((char*)(&(value.type)), sizeof(CoherentSymbolType));
             file->stream.write((char*)(&(value.length)), sizeof(uint64_t));
             file->stream.write((char*)(&(value.nameLength)), sizeof(uint16_t));    
-            numSymbolsWritten++;     
+            file->stream.write((char*)(&(value.name)), value.nameLength);
+            numSymbolsWritten++;   
         }
 
         Logger::Log(COHERENT_SYMBOL_LOG_PREFIX, std::format("Wrote {} symbols to .CSYM folder", numSymbolsWritten).c_str(), LogChannels::Debug);

@@ -41,16 +41,21 @@ namespace Motion
     public:  
         uint64_t offset;                // relative(?) address of 
         uint64_t length = 0xFFFFFFFF;   // length (fffffff = auto)
-        uint16_t nameLength;            // limit name length to reduce size
         CoherentSymbolType type; 
         // Getters for privates
         char* GetName() { return name; }; 
 
         // Setters for privates
-        void SetName(const char* name) { strncpy(this->name, name, COHERENT_SYMBOL_NAME_MAX_LENGTH); };
+        void SetName(const char* name) 
+        { 
+            strncpy(this->name, name, COHERENT_SYMBOL_NAME_MAX_LENGTH); 
+            nameLength = strlen(this->name); // set the name length
+        };
 
     private: 
         char name[COHERENT_SYMBOL_NAME_MAX_LENGTH];
+        uint16_t nameLength;            // limit name length to reduce size
+
     }; 
 
     /// @brief enumerates the search modes
