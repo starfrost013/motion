@@ -82,7 +82,7 @@ namespace Motion
                 CoherentSymbol symbol;
 
                 symbol.type = (CoherentSymbolType)symbolSelectedType;
-                symbol.offset = atoi(addressBuf);
+                symbol.offset = strtol(addressBuf, NULL, 16);
                 symbol.SetName(symbolNameBuf);
                 symbol.length = symbolSizeBuf;
 
