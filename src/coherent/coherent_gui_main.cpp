@@ -279,7 +279,29 @@ namespace Motion
 
                     auto addr = Coherent::currentSystem->GetPC() + pcOffset;
 
-                    ImGui::Text("0x%lx:    %s", addr, Coherent::currentSystem->DisasmInstruction(addr));
+                    // TODO: wrap in std::optional ?!
+
+                    bool useSymbol = false;
+                    CoherentSymbol* symbol;
+
+                    if (!(Coherent::currentSymbolSet.symbols.empty()))
+                    {
+                        symbol = Coherent::currentSymbolSet.ResolveAddress(addr, CoherentSymbolSearchMode::Absolute); //TODO: temp
+                        
+                        if (symbol)
+                            useSymbol = true;
+                    }
+
+                    char* disasm = Coherent::currentSystem->DisasmInstruction(addr);
+                    const char* symbolName = symbol->GetName(); // shutup compiler using this very bad code pattern
+
+                    if (!useSymbol)
+                        ImGui::Text("0x%lx:    %s", addr, disasm);
+                    else
+                    {
+                        uint16_t offset = addr - symbol->offset;
+                        ImGui::Text("%s+%d:    %s", symbolName, offset, disasm);
+                    }
 
                     if (i == 0)
                         ImGui::PopStyleColor();

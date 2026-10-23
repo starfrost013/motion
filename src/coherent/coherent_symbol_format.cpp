@@ -150,7 +150,7 @@ namespace Motion
     CoherentSymbol* CoherentSymbolSet::ResolveAddress(uint64_t address, CoherentSymbolSearchMode searchMode)
     {
         // subtract to get absolute addr
-        if (searchMode == CoherentSymbolSearchMode::Absolute)
+        if (searchMode == CoherentSymbolSearchMode::Relative)
             address -= baseAddress;
 
         // linear search for now. if it's slow change it 

@@ -111,7 +111,7 @@ namespace Motion
         void AddUI() override;
 
         CoherentExtensionType GetExtensionType() override { return CoherentExtensionType::CustomMenuItem; }; 
-        const char* GetName() override { return "Symbol Set Editor"; };
+        const char* GetName() override { return "Symbol Editor"; };
 
         virtual bool GetCoherentInternal() { return true; };
 

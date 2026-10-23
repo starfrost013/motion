@@ -127,7 +127,14 @@ namespace Motion
                 SaveCurrentSet("test0000.csym");
 
             ImGui::SameLine();
-            ImGui::Button("Set as current symbol set");
+
+            if (ImGui::Button("Clear"))
+                symbolSet.symbols.clear();
+
+            if (ImGui::Button("Set as current symbol set"))
+            {
+                Coherent::SetCurrentSymbolSet(symbolSet);
+            }
         }
 
         ImGui::End();
