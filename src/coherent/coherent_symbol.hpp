@@ -111,7 +111,42 @@ namespace Motion
 
         static void Read(const char* fileName, CoherentSymbolSet& set);
         static void Write(const char* fileName, CoherentSymbolSet& set); 
+    };
 
-        
+    // bsd-gl2 format
+    /// @brief might work with other bsds
+    class CoherentSymbolFormatGL2 : public CoherentSymbolFormat
+    {   
+        //
+        enum SymbolType
+        {
+            Undefined = 0x00,
+            External = 0x01,
+            Absolute = 0x02, 
+            Test = 0x04, 
+            Data = 0x06, 
+            BSS = 0x08, 
+            Indr = 0x0A,                /// @brief not sure what this happens
+            AbsoluteSetElement = 0x14,
+            Function = 0x15,            /// @brief the mask for a function
+            TextSetElement = 0x16, 
+            DataSetElement = 0x18, 
+            BssSetElement = 0x1A, 
+            SetVectorPtr = 0x1C,
+
+        };
+
+        struct SymbolEntry
+        {
+            uint32_t namePtr = 0;
+            uint8_t flags = 0; 
+            uint8_t unused = 0;
+            uint16_t debugStab = 0;
+            uint32_t symbolAddress = 0;
+        };
+
+    public: 
+        static void Read(const char* fileName, CoherentSymbolSet& set);
+        static void Write(const char* fileName, CoherentSymbolSet& set);  
     };
 };

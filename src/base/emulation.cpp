@@ -13,6 +13,7 @@
 #include <component/memory.hpp>
 #include <coherent/coherent.hpp>
 #include <base/machine/machines.hpp>
+#include <ui/ui.hpp>
 
 namespace Motion
 {    
@@ -69,6 +70,8 @@ namespace Motion
         //update our emulator event system
         Program::GetRenderer()->FramePreRender();
 
+        MotionUI::CreateMainMenuBar();
+        
         if (Coherent::active)
             Coherent::Frame();
             

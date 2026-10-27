@@ -236,6 +236,25 @@ took a big break, preventative to stop burnout
 * started workgin on symbol format. csym read/write.
 * finally platform specific build directories
 
+## 2026-10-22
+* finally got the symbolic debugger working.
+* uses linear search for now
+* format is:
+    * the header is the uint64_t Coherent, then the version, the number of symbols and the base adress
+    then a list of symbol entries: type (not used), address (can be offset or absolute will be encoded in the header), the length of the name and the name
+    reosslution si crurently a linear search with preosrtng but i will have ot find a better algo
+* extension is .csym
+* supports linear or relative
+
+* TODO:
+    Globals
+    Relative addreses
+    Import from gl2 etc
+
+## 2026-10-24
+
+
+
 v0.3.0 TODO:
 
 * GE and FBC!!!!!!!

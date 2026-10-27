@@ -45,8 +45,8 @@ namespace Motion
             return;
       
         CoherentSymbol symbol;
-
         CoherentSymbolFormatCsym::Header header;
+        
         file->stream.read((char*)(&header), sizeof(CoherentSymbolFormatCsym::Header));
         
         if (header.magic != COHERENT_SYMBOL_FORMAT_MAGIC)
@@ -66,7 +66,6 @@ namespace Motion
             Logger::Log(COHERENT_SYMBOL_LOG_PREFIX, std::format("CoherentSymbolFormat::Read ({}) - no symbols!", fileName).c_str(), LogChannels::Error);
             goto done;          
         }
-
 
         for (uint64_t i = 0; i < header.nrOfSymbols; i++)
         {
