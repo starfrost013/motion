@@ -16,13 +16,19 @@ namespace Motion
                 {
                     ImGui::MenuItem("DSD 5217");
                     ImGui::MenuItem("Storager 3030");
+
+                    ImGui::EndMenu();
                 }
+
+                ImGui::EndMenu();
             } 
 
             if (ImGui::BeginMenu("Hard Drive"))
             {
                 ImGui::MenuItem("Current Disk: blahblah.img", NULL, false, false);
                 ImGui::MenuItem("Insert Disk...");
+
+                ImGui::EndMenu();
             }
             
 
