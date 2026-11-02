@@ -75,7 +75,7 @@ namespace Motion
         return fs->eof; 
     }
 
-    void Filesystem::ReadString(FileStream* fs, char* buf, size_t bufLen, ReadStringType type = ReadStringType::CChar)
+    void Filesystem::ReadString(FileStream* fs, char* buf, size_t bufLen, ReadStringType type)
     {
         if (Filesystem::IsEOF(fs))
             return; 
