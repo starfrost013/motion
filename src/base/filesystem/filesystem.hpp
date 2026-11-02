@@ -28,12 +28,19 @@ namespace Motion
         CreateOrOpen = 1 << 3,
         LogOnFail = 1 << 4,
     }; 
+    
+    enum ReadStringType
+    {
+        CChar,                      // Read until zero or buffer exhausted (WARNING: YOU MUST PASS THE RIGHT BUFFER LENGTH, OR YOU'LL BE IN BIG TROUBLE!!!)
+        Pascal,                     // Length first 
+    };
 
     class Filesystem
     {
     public:
         static FileStream* Open(const char* path, FileFlags mode = FileFlags::Text);
         static void Seek(FileStream* fs, size_t offset);
+        static size_t Tell(FileStream* fs);
         static size_t GetSize(FileStream* fs);
 
         /// @brief safer way of calling eof which does not lock teh stream
@@ -41,5 +48,7 @@ namespace Motion
         /// @return a boolean indicating if we read everything
         static bool IsEOF(FileStream* fs);
         static void Close(FileStream* fs);
+
+        static void ReadString(FileStream* fs, char* ptr, size_t len, ReadStringType type = ReadStringType::CChar);
     };
 }; 

@@ -46,6 +46,11 @@ namespace Motion
     {
         fs->stream.seekg(offset, std::ios_base::beg); // seekg == seekp
     }
+    
+    size_t Filesystem::Tell(FileStream* fs)
+    {
+        return fs->stream.tellg();
+    }
 
     size_t Filesystem::GetSize(FileStream* fs)
     {
@@ -68,6 +73,50 @@ namespace Motion
         fs->eof = fs->stream.eof();
         fs->stream.clear(); //unset failbit so you can read again
         return fs->eof; 
+    }
+
+    void Filesystem::ReadString(FileStream* fs, char* buf, size_t bufLen, ReadStringType type = ReadStringType::CChar)
+    {
+        if (Filesystem::IsEOF(fs))
+            return; 
+
+        uint8_t realLen = 0; 
+        size_t bufPtr = 0;
+
+        switch (type)
+        {
+            case ReadStringType::Pascal:
+                fs->stream.read((char*)(&realLen), sizeof(uint8_t));
+
+                if (realLen > bufLen)
+                {
+                    Logger::Log(FILESYSTEM_LOG_PREFIX, std::format("Filesystem::ReadString with ReadStringType::Pascal: actual string length {} was greater than buffer size {}, truncating", realLen, bufLen).c_str(), LogChannels::Warning);
+                    realLen = bufLen;
+                }
+
+                if (realLen == 0)
+                {
+                    Logger::Log(FILESYSTEM_LOG_PREFIX, std::format("Filesystem::ReadString with ReadStringType::Pascal: string length is 0, nothing to do", realLen, bufLen).c_str(), LogChannels::Warning);
+                    return; 
+                }
+
+                fs->stream.read(buf, realLen);
+                break; 
+            case ReadStringType::CChar:
+                for (int32_t i = 0; i < bufLen; i++)
+                {
+                    fs->stream.read((char*)(buf + bufPtr), sizeof(char));
+
+                    if (buf[bufPtr] == '\0')
+                        break; // hit end of string
+
+                    bufPtr++;
+                }
+
+                Logger::Log(FILESYSTEM_LOG_PREFIX, std::format("Filesystem::ReadString with ReadStringType::CChar: no terminator before bufLen reached!").c_str(), LogChannels::Warning);
+            
+                break;
+        }
     }
 
     void Filesystem::Close(FileStream* fs)

@@ -252,7 +252,10 @@ took a big break, preventative to stop burnout
     Import from gl2 etc
 
 ## 2026-10-24
+* start gl2 format
 
+## 2026-10-26
+* add menu bar for commonly (start a MotionUI independent ot CoherentUI)
 
 
 v0.3.0 TODO:

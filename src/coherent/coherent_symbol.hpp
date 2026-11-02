@@ -37,7 +37,8 @@ namespace Motion
     class CoherentSymbol
     {       
         friend class CoherentSymbolFormatCsym; // ll
-
+        friend class CoherentSymbolFormatGL2;
+        
     public:  
         uint64_t offset;                // relative(?) address of 
         uint64_t length = 0xFFFFFFFF;   // length (fffffff = auto)
@@ -113,12 +114,29 @@ namespace Motion
         static void Write(const char* fileName, CoherentSymbolSet& set); 
     };
 
+    #define GL2_HEADER_MAGIC_OBJECT                     0x0107  // 0407 octal; object or impure binary (kernel uses this and PROM will only load this)
+    #define GL2_HEADER_MAGIC_BINARY                     0x0108  // 0408 octal; pure binary
+    #define GL2_HEADER_MAGIC_DEMAND_PAGED               0x010B  // 0413 octal: demand paged 
+    
     // bsd-gl2 format
     /// @brief might work with other bsds
     class CoherentSymbolFormatGL2 : public CoherentSymbolFormat
     {   
-        //
-        enum SymbolType
+        // a.out header
+        struct GL2Header
+        {
+            uint32_t magic; // ???? and then the actual magic
+            uint32_t textSize;
+            uint32_t dataSize;
+            uint32_t bssSize;
+            uint32_t symSize;
+            uint32_t textRelocSize;
+            uint32_t dataRelocSize;
+            uint32_t entryPoint; 
+        };
+
+        // symbol types
+        enum GL2SymbolType
         {
             Undefined = 0x00,
             External = 0x01,
@@ -136,7 +154,7 @@ namespace Motion
 
         };
 
-        struct SymbolEntry
+        struct GL2SymbolEntry
         {
             uint32_t namePtr = 0;
             uint8_t flags = 0; 
