@@ -82,7 +82,19 @@ namespace Motion
             Filesystem::ReadString(file, nameBuf, STRING_MAX_LONG);
 
             Filesystem::Seek(file, location); // go back
-            
+
+            finalSymbol.SetName(nameBuf);
+            finalSymbol.offset = symbolEntry.symbolAddress;
+
+            if (symbolEntry.flags & GL2SymbolType::Data)
+                finalSymbol.type = CoherentSymbolType::Global;
+            else if (symbolEntry.flags & GL2SymbolType::Function)
+                finalSymbol.type = CoherentSymbolType::Function;
+
+            // add it
+            set.symbols[finalSymbol.offset] = symbolEntry;
+
+            // roll
             numSymsRead++;
         }
 
