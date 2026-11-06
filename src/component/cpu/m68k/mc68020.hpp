@@ -4,7 +4,7 @@
 #include <component/component.hpp>
 #include <component/cpu/cpu.hpp>
 #include <base/emulation.hpp>
-#include <component/cpu/mc68020_moira_bridge.hpp>
+#include <component/cpu/m68k/mc68020_moira_bridge.hpp>
 
 namespace Motion
 {

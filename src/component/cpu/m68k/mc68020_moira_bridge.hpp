@@ -6,7 +6,7 @@
 #include <coherent/coherent.hpp>
 #include <component/component.hpp>
 #include <component/cpu/cpu.hpp>
-#include <component/cpu/moira/Moira.h>
+#include <component/cpu/m68k/moira/Moira.h>
 #include <component/ip2/ip2_interrupt.hpp>
 #include <base/emulation.hpp>
 

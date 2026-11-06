@@ -167,8 +167,6 @@ namespace Motion
     void GF2::FBCExecuteCommand(uint16_t word) // size from GE Passthrough
     {
         // ok
-        uint16_t passthroughPtr = passthroughStart;
-
         pipePeekPtr = passthroughStart;
 
         uint16_t cmd = GEPeekNextCommandWord();
@@ -185,6 +183,8 @@ namespace Motion
     
         // ok we are done. get the microcode state start location
         uint16_t ucodeStart = cmd << 1; 
+
+        Logger::Log(GF2_FBC_LOG_PREFIX, std::format("GF2 GE passed through FBC command {} to GF2 FBC-LLE with {} parameters", cmd, passthroughWords).c_str());
 
         // initiate execution of current ucode
         am2910.Start(ucodeStart, wordBuffer);

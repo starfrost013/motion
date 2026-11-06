@@ -10,7 +10,7 @@
 #include <base/machine/machine.hpp>
 #include <base/machine/machines.hpp>
 #include <component/memory.hpp>
-#include <component/cpu/mc68020.hpp>
+#include <component/cpu/m68k/mc68020.hpp>
 #include <component/ip2/prom.hpp>
 #include <component/ip2/prom_sram.hpp>
 #include <component/ip2/ip2_mmu.hpp>

@@ -1,4 +1,4 @@
-#include <component/cpu/mc68020.hpp>
+#include <component/cpu/m68k/mc68020.hpp>
 
 namespace Motion
 {

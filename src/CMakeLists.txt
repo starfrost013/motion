@@ -7,7 +7,7 @@ include_directories(${CMAKE_SOURCE_DIR}/src)
 include_directories(${CMAKE_SOURCE_DIR}/external/sdl3/include)
 include_directories(${CMAKE_SOURCE_DIR}/external/imgui)
 
-add_subdirectory(${CMAKE_SOURCE_DIR}/src/component/cpu/moira)
+add_subdirectory(${CMAKE_SOURCE_DIR}/src/component/cpu/m68k/moira)
 
 add_executable(motion
 
@@ -27,14 +27,14 @@ add_executable(motion
     base/cvar/cvar.cpp
     component/addrspace.cpp
     component/memory.cpp
-    component/cpu/mc68020_core.cpp
+    component/cpu/m68k/mc68020_core.cpp
 
     coherent/coherent_core.cpp
     coherent/coherent_gui_main.cpp
     render/sdl3/render_sdl3_core.cpp
     component/ip2/prom.cpp
     coherent/coherent_gui_logging.cpp
-    component/cpu/mc68020_debug.cpp
+    component/cpu/m68k/mc68020_debug.cpp
     component/ip2/ip2_mmu.cpp
     component/ip2/ip2_duart.cpp
     component/ip2/ip2_rtc.cpp
