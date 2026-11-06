@@ -168,7 +168,6 @@ namespace Motion
     {
         // ok
         uint16_t passthroughPtr = passthroughStart;
-        uint16_t commandId = pipeData[passthroughPtr];
 
         pipePeekPtr = passthroughStart;
 
@@ -188,7 +187,7 @@ namespace Motion
         uint16_t ucodeStart = cmd << 1; 
 
         // initiate execution of current ucode
-        am2910.Start(ucodeStart);
+        am2910.Start(ucodeStart, wordBuffer);
     }
     
     void GF2::BPCExecuteCommand(uint16_t word)

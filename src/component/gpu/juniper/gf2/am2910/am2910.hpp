@@ -35,7 +35,7 @@ namespace Motion
             this->ucode = ucode;
         }
 
-        void Start(uint16_t pcCtr);
+        void Start(uint16_t pcCtr, uint16_t words[]);
         void Tick();
 
         uint16_t StackPush();

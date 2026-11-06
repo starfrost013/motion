@@ -123,9 +123,17 @@ namespace Motion
     {
         uint16_t cmd = (word & 0xFF);
 
+
         // Go into the fifo
         
         pipeData[pipeWritePtr] = word; 
+
+        // commands passed through to fbc
+        if (passthroughSize > 0 && passthroughWords < passthroughSize)
+        {
+            passthroughWords++;
+            return;
+        }
 
         // high byte all bits high = reconfigure all ges
         if (theGe.reconfiguring && (word & 0xFF00) == 0xFF00)
@@ -159,12 +167,11 @@ namespace Motion
                 passthroughStart = pipeWritePtr;
             }
 
-            passthroughWords++;
 
             if (passthroughWords == passthroughSize)
             {
                 passthroughSize = passthroughStart = passthroughWords = 0;
-                Logger::Log(GF2_GE_LOG_PREFIX, std::format("About to execute FBC command 0x{:x} with 0x{:x} parameters", cmd, theGe.lastGeCommandParameters).c_str(), LogChannels::Debug);
+                Logger::Log(GF2_GE_LOG_PREFIX, std::format("About to execute FBC command 0x{:x} with 0x{:x} parameters", cmd, passthroughWords).c_str(), LogChannels::Debug);
                 FBCExecuteCommand(theGe.lastGeCommand);
 
             }

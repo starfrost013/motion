@@ -16,7 +16,7 @@ namespace Motion
 {
     /// @brief Start exeuction of the am2910. Default is at 0x0.
     /// @param pcReg 
-    void AM2910::Start(uint16_t pcReg)
+    void AM2910::Start(uint16_t pcReg, uint16_t words[])
     {
         this->pcReg = pcReg;
         running = true; 

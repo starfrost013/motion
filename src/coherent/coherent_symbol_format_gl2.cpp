@@ -92,7 +92,7 @@ namespace Motion
                 finalSymbol.type = CoherentSymbolType::Function;
 
             // add it
-            set.symbols[finalSymbol.offset] = symbolEntry;
+            set.symbols[finalSymbol.offset] = finalSymbol;
 
             // roll
             numSymsRead++;
@@ -106,6 +106,6 @@ namespace Motion
         if (!OpenFile(fileName))
             return;
 
-        
+        Logger::Log(COHERENT_LOG_PREFIX_GL2, "Writing GL2 format files is not supported!", LogChannels::Debug);
     }
 }
