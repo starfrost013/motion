@@ -1,3 +1,4 @@
+#include <base/emulation.hpp>
 #include <ui/ui.hpp>
 
 namespace Motion
@@ -6,9 +7,14 @@ namespace Motion
     {
         if (ImGui::BeginMainMenuBar())
         {
-            ImGui::MenuItem("Run");
-            ImGui::MenuItem("Pause");
-            ImGui::MenuItem("Stop");
+            if (ImGui::MenuItem("Run"))
+                Emulation::SetPaused(false);
+
+            if (ImGui::MenuItem("Pause"))
+                Emulation::SetPaused(true);
+
+            if (ImGui::MenuItem("Reset"))
+                Emulation::Reset();
             
             if (ImGui::BeginMenu("Settings"))
             {
