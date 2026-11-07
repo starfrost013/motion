@@ -25,7 +25,7 @@ namespace Motion
         Matrix()
         {
             MOTION_ASSERT_FATAL(X <= 0 || Y <= 0, "Tried to create a matrix with a size of zero ?????");
-            MOTION_ASSERT_WARNING(X >= MATRIX_MINIMUM_WARNING_X || Y >= MATRIX_MINIMUM_WARNING_Y, std::format("That matrix will use {} bytes of memory, are you sure you intended this?", MATRIX_MINIMUM_WARNING_X * MATRIX_MINIMUM_WARNING_Y));
+            MOTION_ASSERT_WARNING(X >= MATRIX_MINIMUM_WARNING_X || Y >= MATRIX_MINIMUM_WARNING_Y, std::format("That matrix will use {} bytes of memory, are you sure you intended this?", MATRIX_MINIMUM_WARNING_X * MATRIX_MINIMUM_WARNING_Y * sizeof(T)));
             return; 
         }
 
@@ -73,7 +73,7 @@ namespace Motion
             std::span<int, X> rowView(&data[Y * X], X); // get an std::span view of the thing
 
             // "parallelised approach" https://mariusbancila.ro/blog/2025/12/12/multiplying-matrices-in-cpp/
-            // this will run many times for e.g. GE 20.8 floats so need so be fast
+            // this will run many times for e.g. GE 20.8 floats so need so be fast. i don't want to bring in an blas library
             std::for_each(
                 std::execution::par,
                 rowView.begin(), rowView.end(),
