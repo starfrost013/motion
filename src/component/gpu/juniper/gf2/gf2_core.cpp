@@ -108,7 +108,6 @@ namespace Motion
     {
         // TEMP !!!
         //ge.Tick();
-        FBCTick();
     }
 
     void GF2::Shutdown()

@@ -262,9 +262,6 @@ namespace Motion
         void GEStart();
         void FBCStart();
 
-        // GE Only performs operations oN command
-        void FBCTick();
-
         uint16_t GERead16(size_t addr);
         uint16_t FBCRead16(size_t addr);
         void GEWrite16(size_t addr, uint16_t value);
@@ -305,7 +302,7 @@ namespace Motion
         void GEPushCommandWord(uint16_t word);
         uint16_t GEPeekNextCommandWord();
         void GEExecuteCommand(uint16_t word);
-        void FBCExecuteCommand(uint16_t word);
+        void FBCExecuteCommand();
         uint16_t FBCExecuteAlternativeCommand(uint16_t id);
         void BPCExecuteCommand(uint16_t word);
 

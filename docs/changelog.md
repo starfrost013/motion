@@ -257,6 +257,19 @@ took a big break, preventative to stop burnout
 ## 2026-10-26
 * add menu bar for commonly (start a MotionUI independent ot CoherentUI)
 
+## 2026-11-03
+* add top bar ui for when the debugger is disabled
+* gl2 format importer work? 
+
+## 2026-11-05
+* make top bar ui work
+
+## 2026-11-06
+* matrix transposition and identity
+* matrix addition and subtraction (ez)
+* matrix multiplication
+* even more logging
+* move 68000 code to m68k folder
 
 v0.3.0 TODO:
 

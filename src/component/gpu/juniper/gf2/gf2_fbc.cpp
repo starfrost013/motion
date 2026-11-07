@@ -158,24 +158,22 @@ namespace Motion
         
         Logger::Log(GF2_FBC_LOG_PREFIX, std::format("FBC Write16 0x{:x} to 0x{:x}", value, addr).c_str(), LogChannels::Debug);
     }
-
-    void GF2::FBCTick()
-    {
-        
-    }
-
-    void GF2::FBCExecuteCommand(uint16_t word) // size from GE Passthrough
+    
+    void GF2::FBCExecuteCommand() // size from GE Passthrough
     {
         // ok
         pipePeekPtr = passthroughStart;
-
+        
+        // HACK: FBC is pointing at the GE PASSTHRU command ! 
+        GEPeekNextCommandWord();
+        
         uint16_t cmd = GEPeekNextCommandWord();
 
         // Temporary buffer for storing the parameters
 
         uint16_t wordBuffer[GF2_GE_MAX_PARAMETERS] = {0};
 
-        for (int32_t i = 0; i < passthroughWords - 1; i++)
+        for (int32_t i = 0; i < passthroughSize - 1; i++)
         {
             uint16_t paramWord = GEPeekNextCommandWord();
             wordBuffer[i + 1] = paramWord; 
@@ -184,7 +182,7 @@ namespace Motion
         // ok we are done. get the microcode state start location
         uint16_t ucodeStart = cmd << 1; 
 
-        Logger::Log(GF2_FBC_LOG_PREFIX, std::format("GF2 GE passed through FBC command {} to GF2 FBC-LLE with {} parameters", cmd, passthroughWords).c_str());
+        Logger::Log(GF2_FBC_LOG_PREFIX, std::format("GF2 GE passed through FBC command {} to GF2 FBC-LLE with {} parameters", cmd, passthroughSize).c_str(), LogChannels::Debug);
 
         // initiate execution of current ucode
         am2910.Start(ucodeStart, wordBuffer);
